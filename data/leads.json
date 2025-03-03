@@ -1,0 +1,23 @@
+[
+  {
+    "type": "contact",
+    "name": "Adrian Infantes",
+    "email": "infantesromeroadrian@gmail.com",
+    "phone": "+346302000",
+    "company": "AIR",
+    "interest": "2",
+    "message": "Me gustaria una demo de sus agentes",
+    "timestamp": "2025-03-03T18:32:18.337531"
+  },
+  {
+    "type": "demo_request",
+    "name": "Adrian Infantes",
+    "email": "infantesromeroadrian@gmail.com",
+    "phone": "+34630071423",
+    "company": "AIR",
+    "preferred_date": "28/03/2025",
+    "preferred_time": "17:00",
+    "interest": "2",
+    "timestamp": "2025-03-03T18:35:19.861005"
+  }
+]

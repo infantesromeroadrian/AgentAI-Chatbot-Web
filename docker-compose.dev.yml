@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  alisys-bot:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    environment:
+      - LM_STUDIO_URL=http://host.docker.internal:1234
+      - PYTHONPATH=/app
+    command: python src/app.py
+    networks:
+      - alisys-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  alisys-network:
+    driver: bridge 
