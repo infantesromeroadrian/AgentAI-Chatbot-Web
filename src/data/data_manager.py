@@ -3,11 +3,31 @@ Gestiona el almacenamiento y recuperación de datos para el chatbot.
 """
 import os
 import json
+import sys
+import traceback
 from datetime import datetime
 from typing import Dict, List, Optional
 
 # Importar el módulo de base de datos
-from src.data.database import save_lead as db_save_lead, get_leads as db_get_leads
+# Corregir la importación para que funcione tanto en desarrollo como en producción
+try:
+    # Intentar importación relativa (para desarrollo)
+    from data.database import save_lead as db_save_lead, get_leads as db_get_leads
+except ImportError:
+    try:
+        # Intentar importación absoluta (para producción en Docker)
+        from src.data.database import save_lead as db_save_lead, get_leads as db_get_leads
+    except ImportError:
+        # Si ambas fallan, imprimir error detallado
+        print("ERROR DE IMPORTACIÓN: No se pudo importar el módulo de base de datos")
+        traceback.print_exc()
+        # Definir funciones dummy para evitar errores
+        def db_save_lead(data): 
+            print(f"ADVERTENCIA: Usando función dummy para db_save_lead. Datos: {data}")
+            return None
+        def db_get_leads(): 
+            print("ADVERTENCIA: Usando función dummy para db_get_leads")
+            return []
 
 class DataManager:
     """Clase para gestionar datos del chatbot"""
@@ -18,6 +38,8 @@ class DataManager:
         os.makedirs(data_dir, exist_ok=True)
         self.filepath = os.path.join(data_dir, filename)
         self.leads = self._load_leads()
+        print(f"DataManager inicializado. Ruta de archivo: {self.filepath}")
+        print(f"Leads cargados: {len(self.leads)}")
     
     def _load_leads(self) -> List[Dict]:
         """Carga los leads existentes del archivo JSON."""
@@ -25,6 +47,10 @@ class DataManager:
             with open(self.filepath, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
+            print(f"Archivo no encontrado: {self.filepath}. Creando lista vacía.")
+            return []
+        except json.JSONDecodeError:
+            print(f"Error al decodificar JSON en {self.filepath}. Creando lista vacía.")
             return []
     
     def save_lead(self, lead_data: Dict) -> bool:
@@ -37,6 +63,8 @@ class DataManager:
         Returns:
             bool: True si se guardó correctamente, False en caso contrario.
         """
+        print(f"Intentando guardar lead: {lead_data}")
+        
         try:
             # Añadir timestamp
             lead_data['timestamp'] = datetime.now().isoformat()
@@ -45,6 +73,7 @@ class DataManager:
             self.leads.append(lead_data)
             with open(self.filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.leads, f, ensure_ascii=False, indent=2)
+            print(f"Lead guardado en JSON. Total de leads: {len(self.leads)}")
             
             # Guardar en la base de datos SQLite
             try:
@@ -57,14 +86,18 @@ class DataManager:
                     'interest': lead_data.get('interest', ''),
                     'message': lead_data.get('message', '')
                 }
-                db_save_lead(db_lead_data)
+                print(f"Intentando guardar en SQLite: {db_lead_data}")
+                result = db_save_lead(db_lead_data)
+                print(f"Resultado de guardar en SQLite: {result}")
             except Exception as db_error:
                 print(f"Error al guardar el lead en la base de datos: {str(db_error)}")
+                traceback.print_exc()
                 # Continuar aunque falle la base de datos, ya que se guardó en JSON
             
             return True
         except Exception as e:
             print(f"Error al guardar el lead: {str(e)}")
+            traceback.print_exc()
             return False
     
     def get_leads(self) -> List[Dict]:

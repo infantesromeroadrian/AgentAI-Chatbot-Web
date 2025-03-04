@@ -2,6 +2,8 @@
 Define las rutas y endpoints de la API del chatbot.
 """
 import json
+import re
+import traceback
 from flask import request, jsonify, render_template, Response, stream_with_context, session
 from services.lm_studio import send_chat_request, check_lm_studio_connection
 from utils.alisys_info import get_alisys_info, generate_alisys_info_stream, generate_contact_form_stream
@@ -20,13 +22,13 @@ def register_routes(app):
     @app.route('/')
     def home():
         """Ruta principal que muestra la interfaz del chatbot"""
-        # Inicializar contador de mensajes en la sesión
-        if 'message_count' not in session:
-            session['message_count'] = 0
-        if 'form_shown' not in session:
-            session['form_shown'] = False
-        if 'last_was_form' not in session:
-            session['last_was_form'] = False
+        # Reiniciar todas las variables de sesión para evitar problemas
+        session['message_count'] = 0
+        session['form_shown'] = False
+        session['last_was_form'] = False
+        session['form_active'] = False
+        session['form_completed'] = False
+        session['last_user_message'] = ''
         return render_template('index.html')
     
     @app.route('/health', methods=['GET'])
@@ -46,6 +48,9 @@ def register_routes(app):
         
         # Guardar el mensaje del usuario en la sesión para uso posterior
         session['last_user_message'] = request.args.get('message', '')
+        
+        # Imprimir el estado actual de la sesión para depuración
+        print(f"Estado de sesión: message_count={session.get('message_count', 0)}, form_shown={session.get('form_shown', False)}, form_active={session.get('form_active', False)}, form_completed={session.get('form_completed', False)}")
         
         # Si el último mensaje fue un formulario y recibimos una respuesta, no incrementamos el contador
         if not session.get('last_was_form', False):
@@ -71,6 +76,29 @@ def register_routes(app):
         
         # Verificar si el formulario ya ha sido completado
         if session.get('form_completed', False):
+            # Verificar si hay datos de contacto guardados
+            leads = get_leads()
+            
+            # Verificar si hay leads y si el último lead tiene los datos mínimos
+            valid_lead_exists = False
+            if leads and len(leads) > 0:
+                last_lead = leads[-1]
+                if hasattr(last_lead, 'name') and hasattr(last_lead, 'email') and last_lead.name and last_lead.email:
+                    valid_lead_exists = True
+            
+            # Si no hay leads válidos, probablemente hubo un error o el formulario no se completó realmente
+            if not valid_lead_exists:
+                # Reiniciar variables de sesión
+                session['form_completed'] = False
+                session['form_shown'] = False
+                session['form_active'] = False
+                
+                # Responder normalmente
+                return Response(
+                    stream_with_context(send_chat_request(user_message)), 
+                    content_type='text/event-stream'
+                )
+            
             # Responder con un mensaje de despedida
             def farewell_response():
                 response = "Gracias por tu mensaje. Un representante de Alisys ya ha recibido tus datos y se pondrá en contacto contigo en breve. Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**."
@@ -126,15 +154,28 @@ def register_routes(app):
             )
         
         # Detectar si el usuario muestra interés o acepta proporcionar información de contacto
-        interest_keywords = ['interesado', 'interesada', 'me interesa', 'quiero saber', 'más información', 
-                            'contactar', 'contacto', 'ok', 'sí', 'si', 'claro', 'por supuesto', 'adelante',
-                            'contactarme', 'llamarme', 'información de contacto', 'mis datos', 'proporcionar',
-                            'formulario', 'datos', 'gustaría', 'quiero', 'ayudar', 'soluciones', 'servicios']
+        interest_keywords = [
+            'interesado', 'interesada', 'me interesa', 'quiero saber más', 
+            'contactar', 'contacto', 'ok', 'sí', 'si', 'claro', 'por supuesto', 'adelante',
+            'contactarme', 'llamarme', 'información de contacto', 'mis datos', 'proporcionar datos',
+            'formulario', 'quiero una demo', 'necesito una demo', 'me gustaría una demo'
+        ]
         
-        shows_interest = any(keyword in user_message for keyword in interest_keywords)
+        # Verificar si el mensaje contiene alguna de las palabras clave de interés
+        # Usamos palabras completas para evitar falsos positivos
+        shows_interest = False
         
-        # Si el usuario muestra interés o menciona algo relacionado con proporcionar información, mostrar el formulario directamente
+        # Primero verificamos si el mensaje es muy corto y contiene palabras clave de interés
+        # Esto evita detectar interés en mensajes largos que contienen palabras comunes
+        if len(user_message.split()) < 10:
+            for keyword in interest_keywords:
+                if f" {keyword} " in f" {user_message} " or user_message.startswith(keyword) or user_message.endswith(keyword):
+                    shows_interest = True
+                    break
+        
+        # Si el usuario muestra interés explícito, mostrar el formulario directamente
         if shows_interest and not session.get('form_shown', False):
+            print("Usuario muestra interés explícito. Mostrando formulario.")
             session['form_shown'] = True
             session['last_was_form'] = True
             session['form_active'] = True
@@ -146,9 +187,11 @@ def register_routes(app):
         # Capturar respuestas del LLM para detectar cuando sugiere proporcionar información de contacto
         def capture_and_check_response():
             full_response = ""
-            contact_keywords = ['contacto', 'información de contacto', 'datos', 'proporcionar', 'contactarte', 
-                               'representante', '¿te gustaría', 'información personal', 'email', 'correo', 'teléfono',
-                               'formulario', 'nombre', 'empresa', 'interés']
+            contact_keywords = [
+                'contacto', 'información de contacto', 'datos de contacto', 'proporcionar datos', 
+                'representante', 'te gustaría ser contactado', 'información personal', 'email', 
+                'correo electrónico', 'teléfono', 'formulario de contacto'
+            ]
             
             # Obtener respuesta del LLM
             for chunk in send_chat_request(user_message):
@@ -161,7 +204,13 @@ def register_routes(app):
                         full_response += data['token']
                         
                         # Si la respuesta del LLM sugiere proporcionar información de contacto y no se ha mostrado el formulario
-                        if any(keyword in full_response.lower() for keyword in contact_keywords) and not session.get('form_shown', False):
+                        # Verificamos que la respuesta tenga suficiente longitud para evitar falsos positivos
+                        # Y que contenga al menos dos palabras clave de contacto para mayor precisión
+                        if (len(full_response) > 150 and 
+                            not session.get('form_shown', False) and 
+                            sum(1 for keyword in contact_keywords if keyword in full_response.lower()) >= 2):
+                            
+                            print("LLM sugiere proporcionar información de contacto. Mostrando formulario.")
                             # Marcar que el formulario se mostrará
                             session['form_shown'] = True
                             session['last_was_form'] = True
@@ -171,29 +220,41 @@ def register_routes(app):
                             if 'done' in data and data['done']:
                                 for form_chunk in generate_contact_form_stream():
                                     yield form_chunk
-                except:
+                except Exception as e:
+                    print(f"Error al procesar chunk: {str(e)}")
                     pass
         
         # Mostrar formulario después de cada respuesta sustancial si no se ha mostrado antes
-        if session['message_count'] >= 2 and not session.get('form_shown', False):
-            # Marcar que el formulario se ha mostrado
-            session['form_shown'] = True
-            session['last_was_form'] = True
-            session['form_active'] = True
+        if session['message_count'] >= 4 and not session.get('form_shown', False):
+            # Verificar si el mensaje del usuario es una pregunta general o una consulta específica
+            general_query_keywords = ['qué', 'que', 'cómo', 'como', 'cuál', 'cual', 'dónde', 'donde', 
+                                     'cuándo', 'cuando', 'quién', 'quien', 'por qué', 'porque', 
+                                     'para qué', 'para que']
             
-            def response_with_form():
-                # Primero enviamos la respuesta normal
-                for chunk in send_chat_request(user_message):
-                    yield chunk
+            is_question = any(keyword in user_message for keyword in general_query_keywords)
+            
+            # Solo mostrar el formulario si es una pregunta general y el mensaje es corto
+            # Esto evita mostrar el formulario en medio de una conversación detallada
+            if is_question and len(user_message.split()) < 15:
+                print("Mostrando formulario después de pregunta general.")
+                # Marcar que el formulario se ha mostrado
+                session['form_shown'] = True
+                session['last_was_form'] = True
+                session['form_active'] = True
                 
-                # Luego enviamos el formulario de contacto
-                for chunk in generate_contact_form_stream():
-                    yield chunk
-            
-            return Response(
-                stream_with_context(response_with_form()),
-                content_type='text/event-stream'
-            )
+                def response_with_form():
+                    # Primero enviamos la respuesta normal
+                    for chunk in send_chat_request(user_message):
+                        yield chunk
+                    
+                    # Luego enviamos el formulario de contacto
+                    for chunk in generate_contact_form_stream():
+                        yield chunk
+                
+                return Response(
+                    stream_with_context(response_with_form()),
+                    content_type='text/event-stream'
+                )
         
         # Para otras preguntas, usar LM Studio normalmente y capturar la respuesta para detectar sugerencias de contacto
         return Response(
@@ -226,6 +287,70 @@ def register_routes(app):
     def submit_contact():
         """Endpoint para guardar los datos del formulario de contacto"""
         data = request.json
+        print(f"Datos recibidos en submit-contact: {data}")
+        
+        # Si el usuario envió todos los datos en un solo mensaje, intentar extraerlos
+        if len(data) == 1 and 'message' in data:
+            message = data['message']
+            print(f"Procesando mensaje único: {message}")
+            
+            # Extraer datos usando expresiones regulares
+            extracted_data = {}
+            
+            # Patrones para extraer información
+            name_patterns = [
+                r'(?:mi nombre es|me llamo|soy) ([^,\.]+)',
+                r'nombre:?\s*([^,\.]+)',
+                r'nombre completo:?\s*([^,\.]+)'
+            ]
+            
+            email_patterns = [
+                r'(?:mi email|mi correo|email|correo) (?:es|:)?\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+                r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+            ]
+            
+            phone_patterns = [
+                r'(?:mi teléfono|mi telefono|teléfono|telefono|móvil|movil) (?:es|:)?\s*([+0-9\s]{7,})',
+                r'(?:tlf|tel|phone):?\s*([+0-9\s]{7,})'
+            ]
+            
+            company_patterns = [
+                r'(?:mi empresa|empresa|compañía|compania) (?:es|:)?\s*([^,\.]+)',
+                r'(?:trabajo en|trabajo para|laboro en) ([^,\.]+)'
+            ]
+            
+            # Extraer nombre
+            for pattern in name_patterns:
+                match = re.search(pattern, message, re.IGNORECASE)
+                if match:
+                    extracted_data['name'] = match.group(1).strip()
+                    break
+            
+            # Extraer email
+            for pattern in email_patterns:
+                match = re.search(pattern, message, re.IGNORECASE)
+                if match:
+                    extracted_data['email'] = match.group(1).strip()
+                    break
+            
+            # Extraer teléfono
+            for pattern in phone_patterns:
+                match = re.search(pattern, message, re.IGNORECASE)
+                if match:
+                    extracted_data['phone'] = match.group(1).strip()
+                    break
+            
+            # Extraer empresa
+            for pattern in company_patterns:
+                match = re.search(pattern, message, re.IGNORECASE)
+                if match:
+                    extracted_data['company'] = match.group(1).strip()
+                    break
+            
+            # Si se extrajeron datos, usarlos
+            if extracted_data:
+                print(f"Datos extraídos del mensaje: {extracted_data}")
+                data.update(extracted_data)
         
         # Validar datos mínimos
         if not data.get('name') or not data.get('email'):
@@ -237,7 +362,7 @@ def register_routes(app):
         # Extraer el mensaje de la conversación si está disponible
         # Esto puede ser útil para entender el contexto de la consulta
         user_message = session.get('last_user_message', '')
-        if user_message:
+        if user_message and 'message' not in data:
             data['message'] = user_message
         
         # Guardar los datos
@@ -252,10 +377,10 @@ def register_routes(app):
                 data['interest'] = 'No especificado'
             
             # Guardar el lead usando el data_manager (que ahora guarda en SQLite también)
-            data_manager.save_lead(data)
+            result = data_manager.save_lead(data)
             
             # Registrar en el log para depuración
-            print(f"Lead guardado: {data}")
+            print(f"Lead guardado: {data}, resultado: {result}")
             
             # Marcar que el formulario ha sido completado
             session['form_completed'] = True
@@ -268,6 +393,7 @@ def register_routes(app):
             })
         except Exception as e:
             print(f"Error al guardar lead: {str(e)}")
+            traceback.print_exc()
             return jsonify({
                 "success": False,
                 "message": f"Error al guardar los datos: {str(e)}"
@@ -308,4 +434,59 @@ def register_routes(app):
             return jsonify({
                 "error": str(e),
                 "message": "Error al obtener los leads de la base de datos."
+            })
+    
+    @app.route('/admin/get-last-lead', methods=['GET'])
+    def get_last_lead():
+        """Endpoint para obtener el último lead guardado"""
+        try:
+            # Obtener leads de la base de datos
+            leads = get_leads()
+            
+            if not leads:
+                # Si no hay leads, intentar obtener del JSON
+                json_leads = data_manager.get_leads()
+                if json_leads:
+                    last_lead = json_leads[-1]
+                    return jsonify({
+                        "success": True,
+                        "lead": {
+                            "name": last_lead.get('name', ''),
+                            "email": last_lead.get('email', ''),
+                            "phone": last_lead.get('phone', 'No proporcionado'),
+                            "company": last_lead.get('company', 'No proporcionada'),
+                            "interest": last_lead.get('interest', 'No especificado')
+                        }
+                    })
+                else:
+                    return jsonify({
+                        "success": False,
+                        "message": "No se encontraron leads"
+                    })
+            
+            # Obtener el último lead (el más reciente)
+            last_lead = leads[-1]
+            
+            # Convertir a formato JSON
+            lead_data = {
+                'id': last_lead.id,
+                'name': last_lead.name,
+                'email': last_lead.email,
+                'phone': last_lead.phone,
+                'company': last_lead.company,
+                'interest': last_lead.interest,
+                'message': last_lead.message,
+                'created_at': last_lead.created_at.isoformat() if last_lead.created_at else None
+            }
+            
+            return jsonify({
+                "success": True,
+                "lead": lead_data
+            })
+        except Exception as e:
+            print(f"Error al obtener el último lead: {str(e)}")
+            traceback.print_exc()
+            return jsonify({
+                "success": False,
+                "message": f"Error al obtener el último lead: {str(e)}"
             }) 

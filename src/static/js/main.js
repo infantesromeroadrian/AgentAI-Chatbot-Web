@@ -76,6 +76,17 @@ function sendMessage() {
         return;
     }
     
+    // Verificar si el mensaje contiene todos los datos del formulario
+    const containsAllFormData = checkIfMessageContainsAllFormData(message);
+    if (containsAllFormData) {
+        addUserMessage(message);
+        userInput.value = '';
+        
+        // Enviar el mensaje completo al servidor para procesamiento
+        submitCompleteFormMessage(message);
+        return;
+    }
+    
     // Deshabilitar entrada mientras procesa
     document.getElementById('user-input').disabled = true;
     document.getElementById('send-button').disabled = true;
@@ -220,14 +231,20 @@ function submitContactForm() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            addBotMessage("### ¡Gracias por proporcionarnos tus datos de contacto! 🎉\n\n" +
+            // Obtener el nombre del usuario y el área de interés
+            const userName = contactFormData.name ? contactFormData.name.split(' ')[0] : '';
+            const interestArea = contactFormData.interest && contactFormData.interest !== 'No especificado' 
+                ? contactFormData.interest 
+                : 'soluciones tecnológicas';
+            
+            addBotMessage("### ¡Gracias, " + userName + ", por proporcionarnos tus datos de contacto! 🎉\n\n" +
                          "Hemos registrado correctamente la siguiente información:\n\n" +
                          "- **Nombre**: " + contactFormData.name + "\n" +
                          "- **Email**: " + contactFormData.email + "\n" +
                          "- **Teléfono**: " + contactFormData.phone + "\n" +
                          "- **Empresa**: " + contactFormData.company + "\n" +
                          "- **Área de interés**: " + contactFormData.interest + "\n\n" +
-                         "Un representante de Alisys se pondrá en contacto contigo **en las próximas 24-48 horas laborables**.\n\n" +
+                         "Un especialista en **" + interestArea + "** se pondrá en contacto contigo **en las próximas 24-48 horas laborables**.\n\n" +
                          "Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**.\n\n" +
                          "¡Que tengas un excelente día!");
                          
@@ -332,4 +349,88 @@ function checkConnectionStatus() {
             document.getElementById('status-indicator').className = 'status-indicator status-disconnected';
             document.getElementById('status').textContent = 'Error de conexión';
         });
+}
+
+// Función para verificar si el mensaje contiene todos los datos del formulario
+function checkIfMessageContainsAllFormData(message) {
+    // Verificar si el mensaje contiene email y nombre al menos
+    const containsEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(message);
+    const containsName = /(mi nombre es|me llamo|soy|nombre:?) .+/.test(message);
+    
+    // Si contiene ambos, probablemente sea un mensaje con todos los datos
+    return containsEmail && containsName && message.length > 50;
+}
+
+// Función para enviar un mensaje completo con todos los datos del formulario
+function submitCompleteFormMessage(message) {
+    // Mostrar mensaje de procesamiento
+    addBotMessage("Procesando tus datos...");
+    
+    // Enviar el mensaje al servidor para extraer los datos
+    fetch('/submit-contact', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: message })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Solicitar los datos guardados para mostrarlos en la confirmación
+            fetch('/admin/get-last-lead', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(leadData => {
+                if (leadData.success) {
+                    // Obtener el nombre del usuario y el área de interés
+                    const userName = leadData.lead.name ? leadData.lead.name.split(' ')[0] : '';
+                    const interestArea = leadData.lead.interest && leadData.lead.interest !== 'No especificado' 
+                        ? leadData.lead.interest 
+                        : 'soluciones tecnológicas';
+                    
+                    addBotMessage("### ¡Gracias, " + userName + ", por proporcionarnos tus datos de contacto! 🎉\n\n" +
+                                 "Hemos registrado correctamente tu información:\n\n" +
+                                 "- **Nombre**: " + leadData.lead.name + "\n" +
+                                 "- **Email**: " + leadData.lead.email + "\n" +
+                                 "- **Teléfono**: " + leadData.lead.phone + "\n" +
+                                 "- **Empresa**: " + leadData.lead.company + "\n\n" +
+                                 "Un especialista en **" + interestArea + "** se pondrá en contacto contigo **en las próximas 24-48 horas laborables**.\n\n" +
+                                 "Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**.\n\n" +
+                                 "¡Que tengas un excelente día!");
+                } else {
+                    // Si no se puede obtener el lead, mostrar mensaje genérico
+                    addBotMessage("### ¡Gracias por proporcionarnos tus datos de contacto! 🎉\n\n" +
+                                 "Hemos registrado correctamente tu información.\n\n" +
+                                 "Un especialista de Alisys se pondrá en contacto contigo **en las próximas 24-48 horas laborables**.\n\n" +
+                                 "Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**.\n\n" +
+                                 "¡Que tengas un excelente día!");
+                }
+                
+                // Marcar la conversación como finalizada
+                sessionStorage.setItem('conversation_completed', 'true');
+            })
+            .catch(error => {
+                // En caso de error, mostrar mensaje genérico
+                addBotMessage("### ¡Gracias por proporcionarnos tus datos de contacto! 🎉\n\n" +
+                             "Hemos registrado correctamente tu información.\n\n" +
+                             "Un representante de Alisys se pondrá en contacto contigo **en las próximas 24-48 horas laborables**.\n\n" +
+                             "Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**.\n\n" +
+                             "¡Que tengas un excelente día!");
+                
+                // Marcar la conversación como finalizada
+                sessionStorage.setItem('conversation_completed', 'true');
+            });
+        } else {
+            addBotMessage("Lo siento, ha ocurrido un error al procesar tus datos: " + data.message + "\n\n" +
+                         "Por favor, proporciona la información de forma más estructurada o contacta con nosotros directamente al **+34 910 200 000**.");
+        }
+    })
+    .catch(error => {
+        addBotMessage("Error al procesar el formulario: " + error.message);
+    });
 } 

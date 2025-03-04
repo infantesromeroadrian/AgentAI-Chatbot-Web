@@ -19,5 +19,23 @@
     "preferred_time": "17:00",
     "interest": "2",
     "timestamp": "2025-03-03T18:35:19.861005"
+  },
+  {
+    "message": "mi nombre es Juan Garcia, juangarcia@gmail.com, 640544560, la empresa se llama callyou",
+    "name": "Juan Garcia",
+    "email": "juangarcia@gmail.com",
+    "company": "se llama callyou",
+    "phone": "No proporcionado",
+    "interest": "No especificado",
+    "timestamp": "2025-03-04T21:38:52.617357"
+  },
+  {
+    "name": "mi nombre es Guillermo Lopez",
+    "email": "guillermolopez@gmail.com",
+    "phone": "650535255",
+    "company": "SEOpati",
+    "interest": "estoy interesado en el area de call center",
+    "message": "si",
+    "timestamp": "2025-03-04T22:01:05.974925"
   }
 ]
