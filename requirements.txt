@@ -4,6 +4,7 @@ python-dotenv<1.0.0,>=0.13.0
 flask>=2.0.0
 PyYAML>=6.0.0
 marked>=0.7.0
+SQLAlchemy>=2.0.0
 
 # Utilidades
 typing-extensions>=4.8.0

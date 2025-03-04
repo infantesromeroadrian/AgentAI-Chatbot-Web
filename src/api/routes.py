@@ -6,6 +6,7 @@ from flask import request, jsonify, render_template, Response, stream_with_conte
 from services.lm_studio import send_chat_request, check_lm_studio_connection
 from utils.alisys_info import get_alisys_info, generate_alisys_info_stream, generate_contact_form_stream
 from data.data_manager import DataManager
+from data.database import get_leads
 
 # Inicializar el gestor de datos
 data_manager = DataManager()
@@ -42,6 +43,9 @@ def register_routes(app):
     def chat_stream():
         """Endpoint para streaming de respuestas del chatbot"""
         user_message = request.args.get('message', '').lower()
+        
+        # Guardar el mensaje del usuario en la sesión para uso posterior
+        session['last_user_message'] = request.args.get('message', '')
         
         # Si el último mensaje fue un formulario y recibimos una respuesta, no incrementamos el contador
         if not session.get('last_was_form', False):
@@ -230,9 +234,28 @@ def register_routes(app):
                 "message": "El nombre y el correo electrónico son obligatorios."
             })
         
+        # Extraer el mensaje de la conversación si está disponible
+        # Esto puede ser útil para entender el contexto de la consulta
+        user_message = session.get('last_user_message', '')
+        if user_message:
+            data['message'] = user_message
+        
         # Guardar los datos
         try:
+            # Asegurarse de que todos los campos necesarios estén presentes
+            # Si no están, usar valores por defecto
+            if not data.get('phone'):
+                data['phone'] = 'No proporcionado'
+            if not data.get('company'):
+                data['company'] = 'No proporcionada'
+            if not data.get('interest'):
+                data['interest'] = 'No especificado'
+            
+            # Guardar el lead usando el data_manager (que ahora guarda en SQLite también)
             data_manager.save_lead(data)
+            
+            # Registrar en el log para depuración
+            print(f"Lead guardado: {data}")
             
             # Marcar que el formulario ha sido completado
             session['form_completed'] = True
@@ -244,7 +267,45 @@ def register_routes(app):
                 "message": "Datos guardados correctamente. Pronto nos pondremos en contacto contigo."
             })
         except Exception as e:
+            print(f"Error al guardar lead: {str(e)}")
             return jsonify({
                 "success": False,
                 "message": f"Error al guardar los datos: {str(e)}"
+            })
+    
+    @app.route('/admin/leads', methods=['GET'])
+    def view_leads():
+        """Endpoint para ver los leads guardados en la base de datos"""
+        # Verificar autenticación básica (esto debería mejorarse en producción)
+        auth = request.authorization
+        if not auth or auth.username != 'admin' or auth.password != 'alisys2024':
+            return Response(
+                'Autenticación requerida', 401,
+                {'WWW-Authenticate': 'Basic realm="Login Required"'}
+            )
+        
+        try:
+            # Obtener leads de la base de datos
+            leads = get_leads()
+            
+            # Convertir a formato JSON
+            leads_data = []
+            for lead in leads:
+                leads_data.append({
+                    'id': lead.id,
+                    'name': lead.name,
+                    'email': lead.email,
+                    'phone': lead.phone,
+                    'company': lead.company,
+                    'interest': lead.interest,
+                    'message': lead.message,
+                    'created_at': lead.created_at.isoformat() if lead.created_at else None
+                })
+            
+            # Renderizar plantilla HTML con los leads
+            return render_template('leads.html', leads=leads_data)
+        except Exception as e:
+            return jsonify({
+                "error": str(e),
+                "message": "Error al obtener los leads de la base de datos."
             }) 
