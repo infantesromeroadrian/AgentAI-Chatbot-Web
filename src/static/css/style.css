@@ -284,6 +284,77 @@ body {
     margin-bottom: 0.8em;
 }
 
+/* Estilos para el formulario */
+.form-help-message {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-left: 4px solid var(--secondary-color);
+    margin: 10px 0;
+    color: #495057;
+    font-size: 0.9em;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    animation: highlight-input 1.5s ease;
+}
+
+.form-help-message i {
+    margin-right: 8px;
+    color: var(--secondary-color);
+}
+
+.message-content strong {
+    color: var(--secondary-color);
+    font-weight: 600;
+}
+
+@keyframes highlight-input {
+    0% { box-shadow: 0 0 0 0 rgba(var(--secondary-color-rgb), 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(var(--secondary-color-rgb), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--secondary-color-rgb), 0); }
+}
+
+#user-input:focus {
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 0.2rem rgba(var(--secondary-color-rgb), 0.25);
+    animation: highlight-input 1.5s infinite;
+}
+
+.message-content.markdown strong {
+    color: var(--secondary-color);
+    font-weight: 600;
+}
+
+/* Estilos específicos para el formulario de contacto */
+.bot-message .message-content h3 {
+    background-color: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border-left: 4px solid var(--primary-color);
+    margin: 15px 0 10px 0;
+}
+
+.bot-message .message-content h2 {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+}
+
+/* Destacar los campos del formulario */
+.bot-message .message-content strong {
+    background-color: rgba(var(--primary-color-rgb), 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+/* Estilo para confirmación de datos ingresados */
+.bot-message .message-content:contains("✅") {
+    background-color: #e8f5e9;
+    border-left: 4px solid #4caf50;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .container {
@@ -291,6 +362,11 @@ body {
     }
     
     .message-content {
-        max-width: 90%;
+        padding: 10px;
+    }
+    
+    .form-help-message {
+        padding: 8px;
+        font-size: 0.85em;
     }
 } 

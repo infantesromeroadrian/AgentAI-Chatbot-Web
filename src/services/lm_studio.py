@@ -4,7 +4,7 @@ Servicio para interactuar con LM Studio.
 import os
 import json
 import requests
-from core.config import LM_STUDIO_URL, TIMEOUT, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS
+from core.config import LM_STUDIO_URL, TIMEOUT, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS, SYSTEM_PROMPT
 
 def check_lm_studio_connection():
     """Verifica la conexión con LM Studio"""
@@ -16,19 +16,25 @@ def check_lm_studio_connection():
 
 def send_chat_request(message, stream=True, temperature=DEFAULT_TEMPERATURE, max_tokens=DEFAULT_MAX_TOKENS):
     """Envía una solicitud a LM Studio y devuelve la respuesta"""
+    # Crear un sistema de mensajes que incluya la instrucción de solicitar datos
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT + "\n\nDespués de proporcionar información sobre Alisys o sus servicios, SIEMPRE debes preguntar al usuario si desea ser contactado por un representante de Alisys. Si el usuario muestra interés, debes decir explícitamente: 'Para poder contactarte, necesitaría algunos datos. ¿Te gustaría proporcionar tu información de contacto?'"},
+        {"role": "user", "content": message}
+    ]
+    
     if stream:
-        return _send_streaming_request(message, temperature, max_tokens)
+        return _send_streaming_request(messages, temperature, max_tokens)
     else:
-        return _send_non_streaming_request(message, temperature, max_tokens)
+        return _send_non_streaming_request(messages, temperature, max_tokens)
 
-def _send_streaming_request(message, temperature, max_tokens):
+def _send_streaming_request(messages, temperature, max_tokens):
     """Envía una solicitud en modo streaming a LM Studio"""
     try:
         # Enviar solicitud a LM Studio con streaming activado
         response = requests.post(
             f"{LM_STUDIO_URL}/v1/chat/completions",
             json={
-                "messages": [{"role": "user", "content": message}],
+                "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "stream": True
@@ -69,13 +75,13 @@ def _send_streaming_request(message, temperature, max_tokens):
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
         yield f"data: {json.dumps({'done': True})}\n\n"
 
-def _send_non_streaming_request(message, temperature, max_tokens):
+def _send_non_streaming_request(messages, temperature, max_tokens):
     """Envía una solicitud no streaming a LM Studio"""
     try:
         response = requests.post(
             f"{LM_STUDIO_URL}/v1/chat/completions",
             json={
-                "messages": [{"role": "user", "content": message}],
+                "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens
             },
