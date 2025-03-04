@@ -349,10 +349,65 @@ body {
     font-weight: 600;
 }
 
-/* Estilo para confirmación de datos ingresados */
+/* Estilos para confirmación de datos ingresados */
+.bot-message .message-content:has(strong) {
+    background-color: #f1f8ff;
+    border-left: 4px solid #0366d6;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+/* Estilo para el mensaje de confirmación final */
+.bot-message .message-content:has(h3:contains("¡Gracias")) {
+    background-color: #e6f7e6;
+    border: 1px solid #4caf50;
+    border-left: 4px solid #4caf50;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Estilo para los campos del formulario confirmados */
 .bot-message .message-content:contains("✅") {
     background-color: #e8f5e9;
     border-left: 4px solid #4caf50;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 8px 0;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Estilo para destacar el teléfono de contacto */
+.bot-message .message-content a[href^="tel:"] {
+    background-color: #f8f9fa;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--primary-color);
+    font-weight: 600;
+    border: 1px solid #dee2e6;
+}
+
+.bot-message .message-content a[href^="tel:"]:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Estilo para las listas en el mensaje de confirmación */
+.bot-message .message-content:has(h3) ul,
+.bot-message .message-content:has(h3) ol {
+    padding-left: 20px;
+    margin: 10px 0;
+}
+
+.bot-message .message-content:has(h3) li {
+    margin-bottom: 5px;
 }
 
 /* Responsive design */

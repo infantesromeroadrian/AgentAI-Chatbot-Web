@@ -79,31 +79,13 @@ def generate_alisys_info_stream():
 def generate_contact_form_stream():
     """Genera un stream con un formulario de contacto"""
     
-    response = f"## ¡Gracias por tu interés en Alisys!\n\n"
+    response = f"## Formulario de contacto\n\n"
     yield f"data: {json.dumps({'token': response})}\n\n"
     
-    response = f"Para que un representante de Alisys pueda contactarte y ofrecerte una solución personalizada, necesitamos algunos datos de contacto.\n\n"
+    response = f"Para que un representante de Alisys pueda contactarte, necesitamos los siguientes datos:\n\n"
     yield f"data: {json.dumps({'token': response})}\n\n"
     
-    response = f"### Por favor, completa el siguiente formulario:\n\n"
-    yield f"data: {json.dumps({'token': response})}\n\n"
-    
-    response = f"**1. Nombre completo**: (Escribe tu nombre y apellidos)\n\n"
+    response = f"**Por favor, proporciona tu nombre completo:**\n\n"
     yield f"data: {json.dumps({'token': response, 'field': 'name'})}\n\n"
-    
-    response = f"**2. Correo electrónico**: (Escribe tu email de contacto)\n\n"
-    yield f"data: {json.dumps({'token': response, 'field': 'email'})}\n\n"
-    
-    response = f"**3. Teléfono**: (Escribe tu número de teléfono para contacto directo)\n\n"
-    yield f"data: {json.dumps({'token': response, 'field': 'phone'})}\n\n"
-    
-    response = f"**4. Empresa**: (Escribe el nombre de tu empresa u organización)\n\n"
-    yield f"data: {json.dumps({'token': response, 'field': 'company'})}\n\n"
-    
-    response = f"**5. Área de interés**:\n* Soluciones Cloud\n* Agentes Virtuales/IA\n* Certificación/Blockchain\n* Robótica\n\n(Indica cuál de estas áreas te interesa más)\n\n"
-    yield f"data: {json.dumps({'token': response, 'field': 'interest'})}\n\n"
-    
-    response = f"**¡Muchas gracias!** Un representante de Alisys se pondrá en contacto contigo lo antes posible para ayudarte con tus necesidades específicas.\n\n"
-    yield f"data: {json.dumps({'token': response})}\n\n"
     
     yield f"data: {json.dumps({'done': True, 'form': True})}\n\n" 

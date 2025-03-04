@@ -4,10 +4,15 @@ let currentField = null;
 let formActive = false;
 let formFieldsCompleted = 0;
 let totalFormFields = 5; // Nombre, email, teléfono, empresa, área de interés
+let formFieldOrder = ['name', 'email', 'phone', 'company', 'interest']; // Orden de los campos
+let currentFieldIndex = 0;
 
 // Inicializar el chat con un mensaje de bienvenida
 document.addEventListener('DOMContentLoaded', function() {
     addBotMessage("¡Hola! Soy el asistente virtual de Alisys. ¿En qué puedo ayudarte hoy?");
+    
+    // Limpiar el estado de la conversación al cargar la página
+    sessionStorage.removeItem('conversation_completed');
 });
 
 function sendMessage() {
@@ -15,27 +20,59 @@ function sendMessage() {
     const message = userInput.value.trim();
     if (!message) return;
     
+    // Si la conversación ya ha sido completada, solo responder con un mensaje de despedida
+    if (sessionStorage.getItem('conversation_completed') === 'true') {
+        addUserMessage(message);
+        addBotMessage("Gracias por tu mensaje. Un representante de Alisys ya ha recibido tus datos y se pondrá en contacto contigo en breve. Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**.");
+        userInput.value = '';
+        return;
+    }
+    
     // Si estamos en modo formulario, procesar el campo actual
     if (formActive && currentField) {
+        // Guardar el valor del campo actual
         contactFormData[currentField] = message;
         formFieldsCompleted++;
         
         // Mostrar confirmación del campo con estilo destacado
-        addBotMessage(`✅ Has ingresado: **${message}**`);
+        addBotMessage(`✅ Has ingresado: **${message}** como tu ${getFieldLabel(currentField)}`);
         
-        // Limpiar el campo actual
-        currentField = null;
-        
-        // Restaurar placeholder
-        document.getElementById('user-input').placeholder = "Escribe tu mensaje...";
-        userInput.value = '';
-        
-        // Si hemos completado todos los campos, enviar el formulario automáticamente
-        if (formFieldsCompleted >= totalFormFields) {
-            submitContactForm();
+        // Determinar el siguiente campo a solicitar
+        if (currentFieldIndex < formFieldOrder.length - 1) {
+            currentFieldIndex++;
+            const nextField = formFieldOrder[currentFieldIndex];
+            currentField = nextField;
+            
+            // Solicitar el siguiente campo
+            const fieldLabel = getFieldLabel(nextField);
+            addBotMessage(`Por favor, ahora ingresa tu **${fieldLabel}**:`);
+            
+            // Cambiar el placeholder del input
+            document.getElementById('user-input').placeholder = `Escribe tu ${fieldLabel} aquí...`;
+            
+            // Aplicar animación de resaltado al input
+            document.getElementById('user-input').classList.add('highlight-input');
+            setTimeout(() => {
+                document.getElementById('user-input').classList.remove('highlight-input');
+            }, 1500);
+            
+            // Enfocar el input
+            document.getElementById('user-input').focus();
+        } else {
+            // Si hemos completado todos los campos, enviar el formulario automáticamente
+            currentField = null;
             formActive = false;
             formFieldsCompleted = 0;
+            currentFieldIndex = 0;
+            
+            // Restaurar placeholder
+            document.getElementById('user-input').placeholder = "Escribe tu mensaje...";
+            
+            // Enviar el formulario
+            submitContactForm();
         }
+        
+        userInput.value = '';
         return;
     }
     
@@ -117,6 +154,10 @@ function sendMessage() {
                 formActive = true;
                 currentField = data.field;
                 
+                // Reiniciar el índice del campo actual basado en el campo recibido
+                currentFieldIndex = formFieldOrder.indexOf(data.field);
+                if (currentFieldIndex === -1) currentFieldIndex = 0;
+                
                 // Cambiar el placeholder del input con instrucción clara
                 const fieldLabel = getFieldLabel(currentField);
                 document.getElementById('user-input').placeholder = `Escribe tu ${fieldLabel} aquí...`;
@@ -179,7 +220,19 @@ function submitContactForm() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            addBotMessage("¡Gracias! Tus datos han sido guardados correctamente. Un representante de Alisys se pondrá en contacto contigo pronto.");
+            addBotMessage("### ¡Gracias por proporcionarnos tus datos de contacto! 🎉\n\n" +
+                         "Hemos registrado correctamente la siguiente información:\n\n" +
+                         "- **Nombre**: " + contactFormData.name + "\n" +
+                         "- **Email**: " + contactFormData.email + "\n" +
+                         "- **Teléfono**: " + contactFormData.phone + "\n" +
+                         "- **Empresa**: " + contactFormData.company + "\n" +
+                         "- **Área de interés**: " + contactFormData.interest + "\n\n" +
+                         "Un representante de Alisys se pondrá en contacto contigo **en las próximas 24-48 horas laborables**.\n\n" +
+                         "Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**.\n\n" +
+                         "¡Que tengas un excelente día!");
+                         
+            // Marcar la conversación como finalizada
+            sessionStorage.setItem('conversation_completed', 'true');
         } else {
             addBotMessage("Lo siento, ha ocurrido un error al guardar tus datos: " + data.message);
         }
@@ -187,6 +240,8 @@ function submitContactForm() {
         contactFormData = {};
         currentField = null;
         formActive = false;
+        formFieldsCompleted = 0;
+        currentFieldIndex = 0;
         // Restaurar placeholder
         document.getElementById('user-input').placeholder = "Escribe tu mensaje...";
     })
@@ -196,6 +251,8 @@ function submitContactForm() {
         contactFormData = {};
         currentField = null;
         formActive = false;
+        formFieldsCompleted = 0;
+        currentFieldIndex = 0;
         // Restaurar placeholder
         document.getElementById('user-input').placeholder = "Escribe tu mensaje...";
     });

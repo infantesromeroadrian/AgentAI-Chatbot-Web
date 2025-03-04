@@ -53,6 +53,51 @@ def register_routes(app):
             # Resetear el flag de último mensaje como formulario
             session['last_was_form'] = False
         
+        # Verificar si es una respuesta a un campo del formulario
+        if session.get('form_active', False):
+            # Simplemente pasar el mensaje al cliente para que lo procese
+            def simple_response():
+                yield f"data: {json.dumps({'token': 'Procesando tu respuesta...'})}\n\n"
+                yield f"data: {json.dumps({'done': True})}\n\n"
+            
+            return Response(
+                stream_with_context(simple_response()), 
+                content_type='text/event-stream'
+            )
+        
+        # Verificar si el formulario ya ha sido completado
+        if session.get('form_completed', False):
+            # Responder con un mensaje de despedida
+            def farewell_response():
+                response = "Gracias por tu mensaje. Un representante de Alisys ya ha recibido tus datos y se pondrá en contacto contigo en breve. Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**."
+                yield f"data: {json.dumps({'token': response})}\n\n"
+                yield f"data: {json.dumps({'done': True})}\n\n"
+            
+            return Response(
+                stream_with_context(farewell_response()), 
+                content_type='text/event-stream'
+            )
+        
+        # Detectar si el usuario está preguntando qué información necesita
+        info_request_keywords = ['qué información', 'que información', 'qué datos', 'que datos', 
+                                'qué necesitas', 'que necesitas', 'qué necesita', 'que necesita',
+                                'cuál es la información', 'cual es la información', 'información necesaria',
+                                'datos necesarios', 'qué requieres', 'que requieres', 'qué requiere', 
+                                'que requiere', 'cómo puedo', 'como puedo', 'datos de contacto',
+                                'mis datos', 'mis información', 'información de contacto', 'contactarme']
+        
+        is_asking_for_info = any(keyword in user_message for keyword in info_request_keywords)
+        
+        # Si el usuario está preguntando qué información necesita, mostrar el formulario directamente
+        if is_asking_for_info:
+            session['form_shown'] = True
+            session['last_was_form'] = True
+            session['form_active'] = True
+            return Response(
+                stream_with_context(generate_contact_form_stream()),
+                content_type='text/event-stream'
+            )
+        
         # Respuestas rápidas para preguntas sobre Alisys
         if 'alisys' in user_message and ('qué es' in user_message or 'que es' in user_message 
                                         or 'info' in user_message or 'información' in user_message 
@@ -60,6 +105,7 @@ def register_routes(app):
             # Después de mostrar la información, mostraremos el formulario
             session['form_shown'] = True
             session['last_was_form'] = True
+            session['form_active'] = True
             
             def combined_stream():
                 # Primero enviamos la información de Alisys
@@ -79,7 +125,7 @@ def register_routes(app):
         interest_keywords = ['interesado', 'interesada', 'me interesa', 'quiero saber', 'más información', 
                             'contactar', 'contacto', 'ok', 'sí', 'si', 'claro', 'por supuesto', 'adelante',
                             'contactarme', 'llamarme', 'información de contacto', 'mis datos', 'proporcionar',
-                            'formulario', 'datos', 'gustaría', 'quiero']
+                            'formulario', 'datos', 'gustaría', 'quiero', 'ayudar', 'soluciones', 'servicios']
         
         shows_interest = any(keyword in user_message for keyword in interest_keywords)
         
@@ -87,6 +133,7 @@ def register_routes(app):
         if shows_interest and not session.get('form_shown', False):
             session['form_shown'] = True
             session['last_was_form'] = True
+            session['form_active'] = True
             return Response(
                 stream_with_context(generate_contact_form_stream()),
                 content_type='text/event-stream'
@@ -96,7 +143,8 @@ def register_routes(app):
         def capture_and_check_response():
             full_response = ""
             contact_keywords = ['contacto', 'información de contacto', 'datos', 'proporcionar', 'contactarte', 
-                               'representante', '¿te gustaría', 'información personal', 'email', 'correo', 'teléfono']
+                               'representante', '¿te gustaría', 'información personal', 'email', 'correo', 'teléfono',
+                               'formulario', 'nombre', 'empresa', 'interés']
             
             # Obtener respuesta del LLM
             for chunk in send_chat_request(user_message):
@@ -113,6 +161,7 @@ def register_routes(app):
                             # Marcar que el formulario se mostrará
                             session['form_shown'] = True
                             session['last_was_form'] = True
+                            session['form_active'] = True
                             
                             # Después de que termine la respuesta actual, mostrar el formulario
                             if 'done' in data and data['done']:
@@ -126,6 +175,7 @@ def register_routes(app):
             # Marcar que el formulario se ha mostrado
             session['form_shown'] = True
             session['last_was_form'] = True
+            session['form_active'] = True
             
             def response_with_form():
                 # Primero enviamos la respuesta normal
@@ -183,6 +233,12 @@ def register_routes(app):
         # Guardar los datos
         try:
             data_manager.save_lead(data)
+            
+            # Marcar que el formulario ha sido completado
+            session['form_completed'] = True
+            session['form_active'] = False
+            session['form_shown'] = True
+            
             return jsonify({
                 "success": True,
                 "message": "Datos guardados correctamente. Pronto nos pondremos en contacto contigo."
