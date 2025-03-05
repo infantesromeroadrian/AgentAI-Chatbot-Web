@@ -194,8 +194,7 @@ function sendMessage(customMessage = null, hidden = false) {
                 messageHeader.appendChild(agentBadge);
                 
                 // Solo añadir botones de selección si estamos en modo agentes
-                // y no es un mensaje de cambio de agente
-                if (useAgents && !message.startsWith('!cambiar_agente:')) {
+                if (useAgents) {
                     // Añadir botones de selección de agente después de la respuesta
                     addAgentSelectionButtons(messageContent);
                 }
@@ -479,8 +478,7 @@ function sendChatRequest(message) {
                 messageHeader.appendChild(agentBadge);
                 
                 // Solo añadir botones de selección si estamos en modo agentes
-                // y no es un mensaje de cambio de agente
-                if (useAgents && !message.startsWith('!cambiar_agente:')) {
+                if (useAgents) {
                     // Añadir botones de selección de agente después de la respuesta
                     addAgentSelectionButtons(messageContent);
                 }

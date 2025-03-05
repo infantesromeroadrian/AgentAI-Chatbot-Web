@@ -122,12 +122,23 @@ class AgentManager:
                 'current_agent': context.get('current_agent', self.context.get('current_agent')),
                 'previous_agent': context.get('previous_agent', self.context.get('previous_agent')),
                 'user_info': context.get('user_info', self.context.get('user_info', {})),
-                'project_info': context.get('project_info', self.context.get('project_info', {}))
+                'project_info': context.get('project_info', self.context.get('project_info', {})),
+                'messages': context.get('messages', self.context.get('messages', []))
             })
             # Usar el contexto externo para el procesamiento
             working_context = context
         else:
             working_context = self.context
+        
+        # Inicializar el historial de mensajes si no existe
+        if 'messages' not in working_context:
+            working_context['messages'] = []
+        
+        # Añadir el mensaje del usuario al historial
+        working_context['messages'].append({
+            'role': 'user',
+            'content': message
+        })
         
         # Verificar si hay un agente específico en el contexto
         specified_agent_name = working_context.get('current_agent')
@@ -143,19 +154,54 @@ class AgentManager:
             # Si se encontró el agente especificado, usarlo
             if specified_agent:
                 self.current_agent = specified_agent
-                return specified_agent.process(message, working_context)
+                
+                # Procesar el mensaje con el agente especificado
+                response_generator = specified_agent.process(message, working_context)
+                
+                # Capturar la respuesta completa para añadirla al historial
+                full_response = ""
+                for chunk in response_generator:
+                    full_response += chunk
+                    yield chunk
+                
+                # Añadir la respuesta al historial de mensajes
+                working_context['messages'].append({
+                    'role': 'assistant',
+                    'content': full_response
+                })
+                
+                return
         
         # Si no hay un agente específico o no se encontró, seleccionar uno
         agent = self.select_agent(message, working_context)
         
         if not agent:
             # Si no hay agente disponible, devolver un mensaje de error
-            def error_generator():
-                yield "No hay agentes disponibles para procesar tu mensaje."
-            return error_generator()
+            error_message = "No hay agentes disponibles para procesar tu mensaje."
+            yield error_message
+            
+            # Añadir el mensaje de error al historial
+            working_context['messages'].append({
+                'role': 'assistant',
+                'content': error_message
+            })
+            
+            return
         
         # Procesar el mensaje con el agente seleccionado
-        return agent.process(message, working_context)
+        response_generator = agent.process(message, working_context)
+        
+        # Capturar la respuesta completa para añadirla al historial
+        full_response = ""
+        for chunk in response_generator:
+            full_response += chunk
+            yield chunk
+        
+        # Añadir la respuesta al historial de mensajes
+        working_context['messages'].append({
+            'role': 'assistant',
+            'content': full_response
+        })
     
     def reset(self) -> None:
         """
@@ -164,6 +210,7 @@ class AgentManager:
         self.current_agent = None
         self.context = {
             'conversation_history': [],
+            'messages': [],
             'user_info': {},
             'project_info': {},
             'current_agent': None,

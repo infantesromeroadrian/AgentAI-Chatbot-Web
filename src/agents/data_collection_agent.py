@@ -3,7 +3,7 @@ Agente de recopilación de datos para el chatbot de Alisys.
 Este agente se encarga de solicitar y recopilar información de contacto
 del usuario de manera estructurada.
 """
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Generator
 from .base_agent import BaseAgent
 from data.data_manager import DataManager
 import re
@@ -110,52 +110,51 @@ class DataCollectionAgent(BaseAgent):
         user_info = context.get('user_info', {})
         missing_fields = self._get_missing_fields(user_info)
         
-        # Determinar el próximo campo a solicitar
-        next_field = missing_fields[0] if missing_fields else None
-        
-        # Verificar si el usuario ha confirmado que ya proporcionó información
-        confirmed_previous = context.get('confirmed_previous_info', False)
+        # Crear un resumen de la información ya recopilada para el prompt
+        collected_info_summary = self._format_user_info(user_info)
         
         # Crear instrucciones específicas basadas en el estado actual
         specific_instructions = ""
-        if confirmed_previous and next_field:
-            specific_instructions = f"""
-El usuario ha indicado que ya proporcionó información anteriormente. 
-Revisa cuidadosamente la información que ya tenemos y NO vuelvas a solicitar datos que ya están en el registro.
-El siguiente campo que necesitamos es: {next_field}.
-Si el usuario dice que ya proporcionó este dato pero no lo tenemos registrado, explícale amablemente que no lo tenemos en nuestro sistema
-y pídele que lo proporcione nuevamente.
-"""
-        elif next_field:
-            if next_field == "name":
-                specific_instructions = "Solicita amablemente el nombre completo del usuario. Si ya te lo ha proporcionado antes, utiliza esa información y no vuelvas a pedirla."
-            elif next_field == "email":
-                specific_instructions = "Solicita la dirección de correo electrónico del usuario. Explica que es necesaria para enviar información relevante."
-            elif next_field == "phone":
-                specific_instructions = "Solicita el número de teléfono del usuario. Explica que es para que un representante pueda contactarle."
-            elif next_field == "company":
-                specific_instructions = "Pregunta por el nombre de la empresa u organización del usuario."
-        else:
-            specific_instructions = "Todos los datos han sido recopilados. Agradece al usuario y confirma que un representante se pondrá en contacto en 24-48 horas."
         
-        # Crear un resumen de la información ya recopilada para el prompt
-        collected_info_summary = self._format_user_info(user_info)
+        if not missing_fields:
+            specific_instructions = """
+Todos los datos han sido recopilados. Agradece al usuario y confirma que un representante se pondrá en contacto en 24-48 horas.
+Muestra un resumen de toda la información recopilada para que el usuario pueda verificarla.
+"""
+        else:
+            # Si es la primera interacción o hay múltiples campos faltantes
+            if len(missing_fields) > 1:
+                specific_instructions = f"""
+Solicita TODOS los datos pendientes de una sola vez para agilizar el proceso. Los campos que necesitamos son: {', '.join(missing_fields)}.
+Explica claramente que necesitas esta información para que un representante pueda contactar al usuario con una propuesta personalizada.
+Sé amable pero directo, y menciona que esta información es confidencial y solo se utilizará para contactar al usuario.
+"""
+            # Si solo falta un campo
+            else:
+                field = missing_fields[0]
+                if field == "name":
+                    specific_instructions = "Solicita amablemente el nombre completo del usuario. Si ya te lo ha proporcionado antes, utiliza esa información y no vuelvas a pedirla."
+                elif field == "email":
+                    specific_instructions = "Solicita la dirección de correo electrónico del usuario. Explica que es necesaria para enviar información relevante."
+                elif field == "phone":
+                    specific_instructions = "Solicita el número de teléfono del usuario. Explica que es para que un representante pueda contactarle."
+                elif field == "company":
+                    specific_instructions = "Pregunta por el nombre de la empresa u organización del usuario."
         
         return f"""Eres un asistente de Alisys especializado en recopilar información de contacto.
 Tu objetivo es obtener los datos necesarios para que un representante pueda contactar al usuario.
 
 INSTRUCCIONES GENERALES:
 1. Comienza explicando claramente que eres el agente de recopilación de datos y que tu objetivo es obtener la información necesaria para que un representante pueda contactar al usuario con una propuesta personalizada.
-2. Solicita amablemente la información de contacto que falta, un dato a la vez.
-3. Confirma cada dato recibido antes de solicitar el siguiente.
+2. IMPORTANTE: Si es la primera interacción, solicita TODOS los datos pendientes de una sola vez (nombre, email, teléfono, empresa) para agilizar el proceso.
+3. Si ya tienes algunos datos, confirma la información recibida y solicita solo los datos faltantes.
 4. Mantén un tono profesional y respetuoso.
 5. Explica brevemente por qué necesitas esta información.
 6. Si el usuario se muestra reacio, no insistas y ofrece alternativas.
 7. Una vez recopilados todos los datos, confirma la información completa.
 8. Informa al usuario que un representante se pondrá en contacto en 24-48 horas.
-9. IMPORTANTE: No vuelvas a solicitar información que ya ha sido proporcionada.
+9. CRÍTICO: No vuelvas a solicitar información que ya ha sido proporcionada.
 10. Cuando hayas recopilado todos los datos necesarios, agradece al usuario y cierra la conversación con un mensaje claro de que el proceso ha sido completado exitosamente.
-11. CRÍTICO: Si el usuario dice que ya proporcionó cierta información, REVISA CUIDADOSAMENTE la información que ya tenemos antes de solicitar nuevamente ese dato.
 
 FLUJO DE CONVERSACIÓN:
 1. Este es el último paso del proceso: Información general → Detalles técnicos → Cotización → Recopilación de datos (tú).
@@ -171,15 +170,14 @@ INSTRUCCIÓN ESPECÍFICA PARA ESTE MENSAJE:
 {specific_instructions}
 
 ESTADO DE LA CONVERSACIÓN:
-- El usuario {'' if not confirmed_previous else 'ha indicado que ya proporcionó información anteriormente. Ten esto en cuenta y no solicites nuevamente esa información.'}
 - Campos ya recopilados: {', '.join(user_info.keys()) if user_info else 'Ninguno'}
-- Próximo campo a solicitar: {next_field if next_field else 'Ninguno, todos los datos han sido recopilados'}
+- Campos pendientes: {', '.join(missing_fields) if missing_fields else 'Ninguno, todos los datos han sido recopilados'}
 
 Historial de conversación:
 {self._format_conversation_history(context)}
 """
     
-    def process(self, message: str, context: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    def process(self, message: str, context: Dict[str, Any]) -> Generator[str, None, None]:
         """
         Procesa un mensaje del usuario y actualiza el contexto.
         
@@ -188,7 +186,7 @@ Historial de conversación:
             context: Contexto de la conversación
             
         Returns:
-            Respuesta del agente y contexto actualizado
+            Generador que produce la respuesta del agente
         """
         # Inicializar user_info si no existe
         if 'user_info' not in context:
@@ -218,14 +216,15 @@ Historial de conversación:
         # Generar el prompt del sistema
         system_prompt = self.get_system_prompt(context)
         
-        # Obtener respuesta del LLM
-        response = self.lm_client.send_chat_request(
+        # Obtener respuesta del LLM en modo streaming
+        for chunk in self.lm_client.generate_stream(
             system_prompt=system_prompt,
-            messages=[{"role": "user", "content": message}],
-            stream=False
-        )
-        
-        return response, context
+            user_message=message
+        ):
+            yield chunk
+            
+        # Actualizar el contexto con el agente actual
+        context['current_agent'] = self.name
     
     def _extract_contact_info(self, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -249,8 +248,24 @@ Historial de conversación:
         if 'user_info' not in context:
             context['user_info'] = {}
         
-        # Extraer nombre completo
+        # Verificar si el usuario indica que ya proporcionó información
+        confirmation_patterns = [
+            r"ya (te|les?) (di|dije|proporcion[eé]|envi[eé]|mand[eé]) (mi|el) (nombre|correo|email|teléfono|telefono|celular|móvil|empresa|compañía)",
+            r"ya lo (di|dije|proporcion[eé]|envi[eé]|mand[eé])",
+            r"(te|les?) (di|dije|proporcion[eé]|envi[eé]|mand[eé]) (mi|el) (nombre|correo|email|teléfono|telefono|celular|móvil|empresa|compañía)",
+            r"(es|son) los (mismos|que te di|que les di)",
+            r"(ya|antes) (te|les?) (lo|los) (di|dije|proporcion[eé]|envi[eé]|mand[eé])"
+        ]
+        
+        for pattern in confirmation_patterns:
+            if re.search(pattern, message, re.IGNORECASE):
+                logging.info(f"Usuario indica que ya proporcionó información: '{message}'")
+                context['confirmed_previous_info'] = True
+                break
+        
+        # Extraer nombre completo - Mejorado para detectar nombres simples
         if 'name' not in context['user_info'] or not context['user_info']['name']:
+            # Primero intentar con patrones específicos
             name_patterns = [
                 r"(?:mi nombre es|me llamo|soy) ([A-Za-zÀ-ÖØ-öø-ÿ\s]+)",
                 r"([A-Za-zÀ-ÖØ-öø-ÿ\s]+) (?:es mi nombre|me llamo)",
@@ -263,28 +278,37 @@ Historial de conversación:
                     name = match.group(1).strip()
                     if len(name) > 2:  # Evitar coincidencias demasiado cortas
                         extracted_info['name'] = name
-                        logging.info(f"Nombre extraído: {name}")
+                        logging.info(f"Nombre extraído con patrón específico: {name}")
                         break
-        
-        # Extraer correo electrónico
-        if 'email' not in context['user_info'] or not context['user_info']['email']:
-            email_patterns = [
-                r"[\w\.-]+@[\w\.-]+\.\w+",
-                r"(?:mi correo|mi email|mi e-mail|correo electrónico) (?:es)? ([\w\.-]+@[\w\.-]+\.\w+)",
-                r"([\w\.-]+@[\w\.-]+\.\w+) (?:es mi correo|es mi email|es mi e-mail)"
-            ]
             
-            for pattern in email_patterns:
-                match = re.search(pattern, message, re.IGNORECASE)
-                if match:
-                    if '@' in match.group(0):
-                        email = match.group(0) if pattern == r"[\w\.-]+@[\w\.-]+\.\w+" else match.group(1)
-                        extracted_info['email'] = email
-                        logging.info(f"Email extraído: {email}")
-                        break
+            # Si no se encontró con patrones específicos, intentar con un enfoque más simple
+            if 'name' not in extracted_info:
+                # Si el mensaje es corto y parece un nombre (sin caracteres especiales)
+                if len(message.split()) <= 4 and re.match(r'^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$', message.strip()):
+                    name = message.strip()
+                    if len(name) > 2:
+                        extracted_info['name'] = name
+                        logging.info(f"Nombre extraído como mensaje simple: {name}")
         
-        # Extraer número de teléfono
+        # Extraer correo electrónico - Mejorado para detectar emails simples
+        if 'email' not in context['user_info'] or not context['user_info']['email']:
+            # Patrón simple para correos electrónicos
+            email_pattern = r"[\w\.-]+@[\w\.-]+\.\w+"
+            email_matches = re.findall(email_pattern, message)
+            
+            if email_matches:
+                email = email_matches[0]
+                extracted_info['email'] = email
+                logging.info(f"Email extraído: {email}")
+            # Si el mensaje es solo un email
+            elif re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', message.strip()):
+                email = message.strip()
+                extracted_info['email'] = email
+                logging.info(f"Email extraído como mensaje simple: {email}")
+        
+        # Extraer número de teléfono - Mejorado para detectar números simples
         if 'phone' not in context['user_info'] or not context['user_info']['phone']:
+            # Patrones para números de teléfono
             phone_patterns = [
                 r"(?:mi teléfono|mi número|mi celular|mi móvil) (?:es)? (\+?[\d\s\(\)\-\.]{7,20})",
                 r"(\+?[\d\s\(\)\-\.]{7,20}) (?:es mi teléfono|es mi número|es mi celular|es mi móvil)",
@@ -302,8 +326,15 @@ Historial de conversación:
                         extracted_info['phone'] = phone
                         logging.info(f"Teléfono extraído: {phone}")
                         break
+            
+            # Si el mensaje es solo un número de teléfono
+            if 'phone' not in extracted_info:
+                digits = re.sub(r'\D', '', message)
+                if len(digits) >= 7 and len(digits) <= 15:
+                    extracted_info['phone'] = message.strip()
+                    logging.info(f"Teléfono extraído como mensaje simple: {message.strip()}")
         
-        # Extraer nombre de la empresa
+        # Extraer nombre de la empresa - Mejorado para detectar nombres de empresa simples
         if 'company' not in context['user_info'] or not context['user_info']['company']:
             company_patterns = [
                 r"(?:mi empresa|mi compañía|mi organización|trabajo para|trabajo en) (?:es|se llama)? ([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+)",
@@ -320,6 +351,14 @@ Historial de conversación:
                         extracted_info['company'] = company
                         logging.info(f"Empresa extraída: {company}")
                         break
+            
+            # Si el mensaje es corto y no se ha identificado como nombre o teléfono, podría ser el nombre de la empresa
+            if 'company' not in extracted_info and 'name' not in extracted_info and 'phone' not in extracted_info and 'email' not in extracted_info:
+                if len(message.split()) <= 5:
+                    company = message.strip()
+                    if len(company) > 2:
+                        extracted_info['company'] = company
+                        logging.info(f"Empresa extraída como mensaje simple: {company}")
         
         # Actualizar el contexto con la información extraída
         if extracted_info:
