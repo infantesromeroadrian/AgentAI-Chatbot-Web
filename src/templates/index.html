@@ -6,12 +6,54 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .mode-switch {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-color);
+        }
+        
+        .mode-switch a {
+            padding: 5px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: var(--text-color);
+            background-color: var(--bg-color-secondary);
+            transition: all 0.3s ease;
+        }
+        
+        .mode-switch a:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .mode-switch a.active {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <i class="fas fa-robot" style="font-size: 28px; color: var(--secondary-color);"></i>
             <h1>Alisys ChatBot</h1>
+            
+            <div class="mode-switch">
+                <span>Modo:</span>
+                <a href="/" class="{{ 'active' if not use_agents else '' }}">Estándar</a>
+                <a href="/agents" class="{{ 'active' if use_agents else '' }}">Agentes</a>
+                {% if use_agents %}
+                <button id="agent-info-button" title="Información sobre los agentes">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+                {% endif %}
+            </div>
         </div>
         
         <div id="chat-container" class="chat-container"></div>
@@ -38,6 +80,73 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        const useAgents = {{ 'true' if use_agents else 'false' }};
+        const healthEndpoint = useAgents ? '/agent/health' : '/health';
+        const chatEndpoint = useAgents ? '/agent/chat/stream' : '/chat/stream';
+        
+        // Información sobre los agentes disponibles
+        const agentsInfo = {
+            "GeneralAgent": {
+                "name": "General",
+                "description": "Información general sobre Alisys",
+                "color": "#607D8B"
+            },
+            "SalesAgent": {
+                "name": "Ventas",
+                "description": "Información sobre productos y servicios",
+                "color": "#2196F3"
+            },
+            "EngineerAgent": {
+                "name": "Técnico",
+                "description": "Soporte técnico y detalles de implementación",
+                "color": "#FF9800"
+            },
+            "DataCollectionAgent": {
+                "name": "Datos",
+                "description": "Recopilación de información de contacto",
+                "color": "#9C27B0"
+            }
+        };
+    </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    {% if use_agents %}
+    <div id="agent-info-modal" class="agent-info-modal">
+        <div class="agent-info-content">
+            <div class="agent-info-header">
+                <h2>Agentes Disponibles</h2>
+                <button id="agent-info-close" class="agent-info-close">&times;</button>
+            </div>
+            <ul class="agent-info-list">
+                <li class="agent-info-item welcome">
+                    <h3>Agente de Bienvenida</h3>
+                    <p>Se activa al inicio de la conversación y para saludos generales.</p>
+                    <p><strong>Palabras clave:</strong> hola, buenos días, saludos, etc.</p>
+                </li>
+                <li class="agent-info-item sales">
+                    <h3>Agente de Ventas</h3>
+                    <p>Proporciona información sobre precios, planes y cotizaciones.</p>
+                    <p><strong>Palabras clave:</strong> precio, costo, cotización, plan, etc.</p>
+                </li>
+                <li class="agent-info-item engineer">
+                    <h3>Agente de Ingeniería</h3>
+                    <p>Ofrece estimaciones de tiempo y recomendaciones técnicas.</p>
+                    <p><strong>Palabras clave:</strong> tecnología, implementación, desarrollo, etc.</p>
+                </li>
+                <li class="agent-info-item data-collection">
+                    <h3>Agente de Recopilación de Datos</h3>
+                    <p>Recopila información de contacto del usuario.</p>
+                    <p><strong>Palabras clave:</strong> contacto, llamar, email, teléfono, etc.</p>
+                </li>
+                <li class="agent-info-item general">
+                    <h3>Agente General</h3>
+                    <p>Maneja consultas generales sobre Alisys y sus servicios.</p>
+                    <p>Se activa cuando ningún otro agente puede manejar el mensaje.</p>
+                </li>
+            </ul>
+        </div>
+    </div>
+    {% endif %}
 </body>
 </html> 

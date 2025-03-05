@@ -9,9 +9,23 @@ from services.lm_studio import send_chat_request, check_lm_studio_connection
 from utils.alisys_info import get_alisys_info, generate_alisys_info_stream, generate_contact_form_stream
 from data.data_manager import DataManager
 from data.database import get_leads
+from agents.agent_manager import AgentManager
+from agents.general_agent import GeneralAgent
+from agents.sales_agent import SalesAgent
+from agents.engineer_agent import EngineerAgent
+from agents.data_collection_agent import DataCollectionAgent
 
 # Inicializar el gestor de datos
 data_manager = DataManager()
+
+# Inicializar el gestor de agentes
+agent_manager = AgentManager()
+
+# Registrar los agentes disponibles
+agent_manager.register_agent(GeneralAgent())
+agent_manager.register_agent(SalesAgent())
+agent_manager.register_agent(EngineerAgent())
+agent_manager.register_agent(DataCollectionAgent())
 
 def register_routes(app):
     """Registra todas las rutas de la aplicación"""
@@ -29,6 +43,10 @@ def register_routes(app):
         session['form_active'] = False
         session['form_completed'] = False
         session['last_user_message'] = ''
+        
+        # Reiniciar el contexto del gestor de agentes
+        agent_manager.reset()
+        
         return render_template('index.html')
     
     @app.route('/health', methods=['GET'])
@@ -44,10 +62,10 @@ def register_routes(app):
     @app.route('/chat/stream', methods=['GET'])
     def chat_stream():
         """Endpoint para streaming de respuestas del chatbot"""
-        user_message = request.args.get('message', '').lower()
+        user_message = request.args.get('message', '')
         
         # Guardar el mensaje del usuario en la sesión para uso posterior
-        session['last_user_message'] = request.args.get('message', '')
+        session['last_user_message'] = user_message
         
         # Imprimir el estado actual de la sesión para depuración
         print(f"Estado de sesión: message_count={session.get('message_count', 0)}, form_shown={session.get('form_shown', False)}, form_active={session.get('form_active', False)}, form_completed={session.get('form_completed', False)}")
@@ -92,173 +110,65 @@ def register_routes(app):
                 session['form_completed'] = False
                 session['form_shown'] = False
                 session['form_active'] = False
+            else:
+                # Responder con un mensaje de despedida
+                def farewell_response():
+                    response = "Gracias por tu mensaje. Un representante de Alisys ya ha recibido tus datos y se pondrá en contacto contigo en breve. Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**."
+                    yield f"data: {json.dumps({'token': response})}\n\n"
+                    yield f"data: {json.dumps({'done': True})}\n\n"
                 
-                # Responder normalmente
                 return Response(
-                    stream_with_context(send_chat_request(user_message)), 
+                    stream_with_context(farewell_response()), 
                     content_type='text/event-stream'
                 )
-            
-            # Responder con un mensaje de despedida
-            def farewell_response():
-                response = "Gracias por tu mensaje. Un representante de Alisys ya ha recibido tus datos y se pondrá en contacto contigo en breve. Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**."
-                yield f"data: {json.dumps({'token': response})}\n\n"
+        
+        # Crear o actualizar el contexto para los agentes
+        context = {
+            'message_count': session.get('message_count', 0),
+            'form_shown': session.get('form_shown', False),
+            'form_active': session.get('form_active', False),
+            'form_completed': session.get('form_completed', False),
+            'last_user_message': session.get('last_user_message', ''),
+            'current_agent': session.get('current_agent', None),
+            'previous_agent': session.get('previous_agent', None),
+            'user_info': session.get('user_info', {}),
+            'project_info': session.get('project_info', {})
+        }
+        
+        # Procesar el mensaje con el gestor de agentes
+        def process_with_agents():
+            try:
+                # Obtener la respuesta del agente adecuado
+                for chunk in agent_manager.process_message(user_message, context):
+                    # Formatear la respuesta para SSE
+                    yield f"data: {json.dumps({'token': chunk})}\n\n"
+                
+                # Marcar como completado
                 yield f"data: {json.dumps({'done': True})}\n\n"
-            
-            return Response(
-                stream_with_context(farewell_response()), 
-                content_type='text/event-stream'
-            )
-        
-        # Detectar si el usuario está preguntando qué información necesita
-        info_request_keywords = ['qué información', 'que información', 'qué datos', 'que datos', 
-                                'qué necesitas', 'que necesitas', 'qué necesita', 'que necesita',
-                                'cuál es la información', 'cual es la información', 'información necesaria',
-                                'datos necesarios', 'qué requieres', 'que requieres', 'qué requiere', 
-                                'que requiere', 'cómo puedo', 'como puedo', 'datos de contacto',
-                                'mis datos', 'mis información', 'información de contacto', 'contactarme']
-        
-        is_asking_for_info = any(keyword in user_message for keyword in info_request_keywords)
-        
-        # Si el usuario está preguntando qué información necesita, mostrar el formulario directamente
-        if is_asking_for_info:
-            session['form_shown'] = True
-            session['last_was_form'] = True
-            session['form_active'] = True
-            return Response(
-                stream_with_context(generate_contact_form_stream()),
-                content_type='text/event-stream'
-            )
-        
-        # Respuestas rápidas para preguntas sobre Alisys
-        if 'alisys' in user_message and ('qué es' in user_message or 'que es' in user_message 
-                                        or 'info' in user_message or 'información' in user_message 
-                                        or 'hablame' in user_message):
-            # Después de mostrar la información, mostraremos el formulario
-            session['form_shown'] = True
-            session['last_was_form'] = True
-            session['form_active'] = True
-            
-            def combined_stream():
-                # Primero enviamos la información de Alisys
-                for chunk in generate_alisys_info_stream():
-                    yield chunk
                 
-                # Luego enviamos el formulario de contacto
-                for chunk in generate_contact_form_stream():
-                    yield chunk
-            
-            return Response(
-                stream_with_context(combined_stream()), 
-                content_type='text/event-stream'
-            )
-        
-        # Detectar si el usuario muestra interés o acepta proporcionar información de contacto
-        interest_keywords = [
-            'interesado', 'interesada', 'me interesa', 'quiero saber más', 
-            'contactar', 'contacto', 'ok', 'sí', 'si', 'claro', 'por supuesto', 'adelante',
-            'contactarme', 'llamarme', 'información de contacto', 'mis datos', 'proporcionar datos',
-            'formulario', 'quiero una demo', 'necesito una demo', 'me gustaría una demo'
-        ]
-        
-        # Verificar si el mensaje contiene alguna de las palabras clave de interés
-        # Usamos palabras completas para evitar falsos positivos
-        shows_interest = False
-        
-        # Primero verificamos si el mensaje es muy corto y contiene palabras clave de interés
-        # Esto evita detectar interés en mensajes largos que contienen palabras comunes
-        if len(user_message.split()) < 10:
-            for keyword in interest_keywords:
-                if f" {keyword} " in f" {user_message} " or user_message.startswith(keyword) or user_message.endswith(keyword):
-                    shows_interest = True
-                    break
-        
-        # Si el usuario muestra interés explícito, mostrar el formulario directamente
-        if shows_interest and not session.get('form_shown', False):
-            print("Usuario muestra interés explícito. Mostrando formulario.")
-            session['form_shown'] = True
-            session['last_was_form'] = True
-            session['form_active'] = True
-            return Response(
-                stream_with_context(generate_contact_form_stream()),
-                content_type='text/event-stream'
-            )
-        
-        # Capturar respuestas del LLM para detectar cuando sugiere proporcionar información de contacto
-        def capture_and_check_response():
-            full_response = ""
-            contact_keywords = [
-                'contacto', 'información de contacto', 'datos de contacto', 'proporcionar datos', 
-                'representante', 'te gustaría ser contactado', 'información personal', 'email', 
-                'correo electrónico', 'teléfono', 'formulario de contacto'
-            ]
-            
-            # Obtener respuesta del LLM
-            for chunk in send_chat_request(user_message):
-                yield chunk
+                # Actualizar la sesión con el contexto actualizado
+                session['current_agent'] = context.get('current_agent')
+                session['previous_agent'] = context.get('previous_agent')
+                session['user_info'] = context.get('user_info', {})
+                session['project_info'] = context.get('project_info', {})
                 
-                # Extraer el token si existe
-                try:
-                    data = json.loads(chunk.replace('data: ', ''))
-                    if 'token' in data:
-                        full_response += data['token']
-                        
-                        # Si la respuesta del LLM sugiere proporcionar información de contacto y no se ha mostrado el formulario
-                        # Verificamos que la respuesta tenga suficiente longitud para evitar falsos positivos
-                        # Y que contenga al menos dos palabras clave de contacto para mayor precisión
-                        if (len(full_response) > 150 and 
-                            not session.get('form_shown', False) and 
-                            sum(1 for keyword in contact_keywords if keyword in full_response.lower()) >= 2):
-                            
-                            print("LLM sugiere proporcionar información de contacto. Mostrando formulario.")
-                            # Marcar que el formulario se mostrará
-                            session['form_shown'] = True
-                            session['last_was_form'] = True
-                            session['form_active'] = True
-                            
-                            # Después de que termine la respuesta actual, mostrar el formulario
-                            if 'done' in data and data['done']:
-                                for form_chunk in generate_contact_form_stream():
-                                    yield form_chunk
-                except Exception as e:
-                    print(f"Error al procesar chunk: {str(e)}")
-                    pass
-        
-        # Mostrar formulario después de cada respuesta sustancial si no se ha mostrado antes
-        if session['message_count'] >= 4 and not session.get('form_shown', False):
-            # Verificar si el mensaje del usuario es una pregunta general o una consulta específica
-            general_query_keywords = ['qué', 'que', 'cómo', 'como', 'cuál', 'cual', 'dónde', 'donde', 
-                                     'cuándo', 'cuando', 'quién', 'quien', 'por qué', 'porque', 
-                                     'para qué', 'para que']
-            
-            is_question = any(keyword in user_message for keyword in general_query_keywords)
-            
-            # Solo mostrar el formulario si es una pregunta general y el mensaje es corto
-            # Esto evita mostrar el formulario en medio de una conversación detallada
-            if is_question and len(user_message.split()) < 15:
-                print("Mostrando formulario después de pregunta general.")
-                # Marcar que el formulario se ha mostrado
-                session['form_shown'] = True
-                session['last_was_form'] = True
-                session['form_active'] = True
+                # Actualizar variables de formulario si fueron modificadas por los agentes
+                if 'form_completed' in context:
+                    session['form_completed'] = context['form_completed']
+                if 'form_shown' in context:
+                    session['form_shown'] = context['form_shown']
+                if 'form_active' in context:
+                    session['form_active'] = context['form_active']
                 
-                def response_with_form():
-                    # Primero enviamos la respuesta normal
-                    for chunk in send_chat_request(user_message):
-                        yield chunk
-                    
-                    # Luego enviamos el formulario de contacto
-                    for chunk in generate_contact_form_stream():
-                        yield chunk
-                
-                return Response(
-                    stream_with_context(response_with_form()),
-                    content_type='text/event-stream'
-                )
+            except Exception as e:
+                print(f"Error al procesar mensaje con agentes: {str(e)}")
+                traceback.print_exc()
+                yield f"data: {json.dumps({'token': 'Lo siento, ha ocurrido un error al procesar tu mensaje. Por favor, inténtalo de nuevo.'})}\n\n"
+                yield f"data: {json.dumps({'done': True})}\n\n"
         
-        # Para otras preguntas, usar LM Studio normalmente y capturar la respuesta para detectar sugerencias de contacto
+        # Usar el sistema de agentes para procesar el mensaje
         return Response(
-            stream_with_context(capture_and_check_response()), 
+            stream_with_context(process_with_agents()), 
             content_type='text/event-stream'
         )
     

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 # Importar rutas de la API
 from api.routes import register_routes
+from api.agent_routes import register_agent_routes
 
 # Cargar variables de entorno
 load_dotenv()
@@ -15,8 +16,14 @@ def create_app():
     """Crea y configura la aplicación Flask"""
     app = Flask(__name__)
     
-    # Registrar rutas
+    # Configurar la clave secreta para las sesiones
+    app.secret_key = os.getenv('SECRET_KEY', 'alisys_chatbot_secret_key')
+    
+    # Registrar rutas tradicionales
     register_routes(app)
+    
+    # Registrar rutas basadas en agentes (experimentales)
+    register_agent_routes(app)
     
     return app
 

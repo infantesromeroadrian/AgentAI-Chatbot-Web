@@ -13,11 +13,48 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Limpiar el estado de la conversación al cargar la página
     sessionStorage.removeItem('conversation_completed');
+    
+    // Inicializar el chatbot
+    checkConnectionStatus();
+    
+    // Manejar la tecla Enter en el input
+    document.getElementById('user-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+    
+    // Si estamos en modo agentes, configurar el botón de información
+    if (useAgents) {
+        const infoButton = document.getElementById('agent-info-button');
+        const infoModal = document.getElementById('agent-info-modal');
+        const closeButton = document.getElementById('agent-info-close');
+        
+        if (infoButton && infoModal && closeButton) {
+            // Mostrar el modal al hacer clic en el botón de información
+            infoButton.addEventListener('click', function() {
+                infoModal.style.display = 'flex';
+            });
+            
+            // Cerrar el modal al hacer clic en el botón de cierre
+            closeButton.addEventListener('click', function() {
+                infoModal.style.display = 'none';
+            });
+            
+            // Cerrar el modal al hacer clic fuera del contenido
+            infoModal.addEventListener('click', function(event) {
+                if (event.target === infoModal) {
+                    infoModal.style.display = 'none';
+                }
+            });
+        }
+    }
 });
 
-function sendMessage() {
+function sendMessage(customMessage = null, hidden = false) {
     const userInput = document.getElementById('user-input');
-    const message = userInput.value.trim();
+    const message = customMessage || userInput.value.trim();
+    
     if (!message) return;
     
     // Si la conversación ya ha sido completada, solo responder con un mensaje de despedida
@@ -116,10 +153,13 @@ function sendMessage() {
     messageContent.className = 'message-content markdown';
     currentResponseElement.appendChild(messageContent);
     
-    document.getElementById('chat-container').appendChild(currentResponseElement);
+    // Solo añadir al chat si no es un mensaje oculto
+    if (!hidden) {
+        document.getElementById('chat-container').appendChild(currentResponseElement);
+    }
     
     // Usar streaming para la respuesta
-    const eventSource = new EventSource('/chat/stream?message=' + encodeURIComponent(message));
+    const eventSource = new EventSource(chatEndpoint + '?message=' + encodeURIComponent(message));
     let fullResponse = '';
     
     eventSource.onmessage = function(event) {
@@ -137,6 +177,29 @@ function sendMessage() {
             
             // Renderizar markdown completo al final
             messageContent.innerHTML = marked.parse(fullResponse);
+            
+            // Mostrar el agente que respondió
+            if (data.agent) {
+                const agentId = data.agent;
+                const agentInfo = agentsInfo[agentId] || { 
+                    name: agentId.replace('Agent', ''), 
+                    color: '#607D8B' 
+                };
+                
+                const agentBadge = document.createElement('div');
+                agentBadge.className = `agent-badge agent-${agentId}`;
+                agentBadge.textContent = `Agente: ${agentInfo.name}`;
+                agentBadge.style.backgroundColor = agentInfo.color + '20'; // Añadir transparencia
+                agentBadge.style.borderColor = agentInfo.color;
+                messageHeader.appendChild(agentBadge);
+                
+                // Solo añadir botones de selección si estamos en modo agentes
+                // y no es un mensaje de cambio de agente
+                if (useAgents && !message.startsWith('!cambiar_agente:')) {
+                    // Añadir botones de selección de agente después de la respuesta
+                    addAgentSelectionButtons(messageContent);
+                }
+            }
             
             // Si es un formulario completado, enviar los datos
             if (data.form && Object.keys(contactFormData).length > 0) {
@@ -323,18 +386,17 @@ function addBotMessage(text) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// Manejar envío con Enter
-document.getElementById('user-input').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        sendMessage();
-    }
-});
+// Función para hacer scroll al final del chat
+function scrollToBottom() {
+    const chatContainer = document.getElementById('chat-container');
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
 
 // Verificar estado de conexión al cargar
 window.addEventListener('load', checkConnectionStatus);
 
 function checkConnectionStatus() {
-    fetch('/health')
+    fetch(healthEndpoint)
         .then(response => response.json())
         .then(data => {
             if (data.lm_studio_connected) {
@@ -349,6 +411,111 @@ function checkConnectionStatus() {
             document.getElementById('status-indicator').className = 'status-indicator status-disconnected';
             document.getElementById('status').textContent = 'Error de conexión';
         });
+}
+
+// Función para enviar un mensaje al servidor (utilizada por los botones de agente)
+function sendChatRequest(message) {
+    // Deshabilitar entrada mientras procesa
+    document.getElementById('user-input').disabled = true;
+    document.getElementById('send-button').disabled = true;
+    document.getElementById('thinking').style.display = 'flex';
+    document.getElementById('status-indicator').className = 'status-indicator status-thinking';
+    document.getElementById('status').textContent = 'Generando respuesta...';
+    
+    // Preparar para respuesta del bot
+    currentResponseElement = document.createElement('div');
+    currentResponseElement.className = 'message bot-message';
+    
+    const messageHeader = document.createElement('div');
+    messageHeader.className = 'message-header';
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar bot-avatar';
+    avatar.innerHTML = '<i class="fas fa-robot"></i>';
+    
+    messageHeader.appendChild(avatar);
+    currentResponseElement.appendChild(messageHeader);
+    
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content markdown';
+    currentResponseElement.appendChild(messageContent);
+    
+    // Añadir al chat
+    document.getElementById('chat-container').appendChild(currentResponseElement);
+    
+    // Usar streaming para la respuesta
+    const eventSource = new EventSource(chatEndpoint + '?message=' + encodeURIComponent(message));
+    let fullResponse = '';
+    
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        if (data.done) {
+            // Finalizar streaming
+            eventSource.close();
+            document.getElementById('thinking').style.display = 'none';
+            document.getElementById('status-indicator').className = 'status-indicator status-connected';
+            document.getElementById('status').textContent = 'Conectado';
+            document.getElementById('user-input').disabled = false;
+            document.getElementById('send-button').disabled = false;
+            document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+            
+            // Renderizar markdown completo al final
+            messageContent.innerHTML = marked.parse(fullResponse);
+            
+            // Mostrar el agente que respondió
+            if (data.agent) {
+                const agentId = data.agent;
+                const agentInfo = agentsInfo[agentId] || { 
+                    name: agentId.replace('Agent', ''), 
+                    color: '#607D8B' 
+                };
+                
+                const agentBadge = document.createElement('div');
+                agentBadge.className = `agent-badge agent-${agentId}`;
+                agentBadge.textContent = `Agente: ${agentInfo.name}`;
+                agentBadge.style.backgroundColor = agentInfo.color + '20'; // Añadir transparencia
+                agentBadge.style.borderColor = agentInfo.color;
+                messageHeader.appendChild(agentBadge);
+                
+                // Solo añadir botones de selección si estamos en modo agentes
+                // y no es un mensaje de cambio de agente
+                if (useAgents && !message.startsWith('!cambiar_agente:')) {
+                    // Añadir botones de selección de agente después de la respuesta
+                    addAgentSelectionButtons(messageContent);
+                }
+            }
+        } else if (data.error) {
+            // Mostrar error
+            messageContent.textContent = 'Error: ' + data.error;
+            currentResponseElement.className = 'message error-message';
+            eventSource.close();
+            document.getElementById('thinking').style.display = 'none';
+            document.getElementById('status-indicator').className = 'status-indicator status-disconnected';
+            document.getElementById('status').textContent = 'Error';
+            document.getElementById('user-input').disabled = false;
+            document.getElementById('send-button').disabled = false;
+        } else if (data.token) {
+            // Agregar token a la respuesta
+            fullResponse += data.token;
+            // Actualizar con renderizado parcial de markdown
+            messageContent.innerHTML = marked.parse(fullResponse);
+            document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+        }
+    };
+    
+    eventSource.onerror = function() {
+        eventSource.close();
+        if (messageContent.textContent === '') {
+            messageContent.textContent = 'Error: No se pudo conectar con el servidor.';
+            currentResponseElement.className = 'message error-message';
+        }
+        document.getElementById('thinking').style.display = 'none';
+        document.getElementById('status-indicator').className = 'status-indicator status-disconnected';
+        document.getElementById('status').textContent = 'Error de conexión';
+        document.getElementById('user-input').disabled = false;
+        document.getElementById('send-button').disabled = false;
+    };
 }
 
 // Función para verificar si el mensaje contiene todos los datos del formulario
@@ -433,4 +600,49 @@ function submitCompleteFormMessage(message) {
     .catch(error => {
         addBotMessage("Error al procesar el formulario: " + error.message);
     });
+}
+
+/**
+ * Añade botones para seleccionar el agente con el que se desea continuar la conversación
+ * @param {HTMLElement} container - El contenedor donde se añadirán los botones
+ */
+function addAgentSelectionButtons(container) {
+    // Crear el contenedor para los botones
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.className = 'agent-selection-buttons';
+    
+    // Añadir título
+    const title = document.createElement('div');
+    title.className = 'agent-selection-title';
+    title.textContent = '¿Con qué agente deseas continuar?';
+    buttonsContainer.appendChild(title);
+    
+    // Usar la información de agentes definida en el HTML
+    for (const [agentId, agentInfo] of Object.entries(agentsInfo)) {
+        const button = document.createElement('button');
+        button.className = `agent-button agent-button-${agentId}`;
+        button.innerHTML = `<strong>${agentInfo.name}</strong><span>${agentInfo.description}</span>`;
+        
+        // Añadir evento de clic
+        button.addEventListener('click', function() {
+            // Enviar mensaje especial para cambiar de agente
+            const message = `!cambiar_agente:${agentId}`;
+            
+            // Añadir mensaje del usuario (visible)
+            const userMessageText = `Cambiar al agente: ${agentInfo.name}`;
+            addUserMessage(userMessageText);
+            
+            // Enviar el mensaje al servidor
+            sendChatRequest(message);
+            
+            // Limpiar el input y hacer scroll
+            document.getElementById('user-input').value = '';
+            scrollToBottom();
+        });
+        
+        buttonsContainer.appendChild(button);
+    }
+    
+    // Añadir los botones al contenedor
+    container.appendChild(buttonsContainer);
 } 

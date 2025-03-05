@@ -1,0 +1,119 @@
+┌─────────────────────────────────────────┐
+│          INTERFAZ DE USUARIO            │
+└───────────────────┬─────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│             AGENT MANAGER               │
+└───────────────────┬─────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│          SELECTOR DE AGENTES            │
+└─────┬─────────────┬────────────────┬────┘
+      │             │                │
+      ▼             ▼                ▼
+┌──────────┐   ┌──────────┐    ┌──────────┐
+│  AGENT 1  │  │  AGENT 2 │    │  AGENT n  │
+└────┬─────┘   └────┬─────┘    └────┬─────┘
+     │              │               │
+     └──────────────┼───────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│                  LLM                    │
+└─────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║  ESQUEMA COMPLETO Y PROCESO DEL SISTEMA MULTI-AGENTE PARA ALISYS           ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                          FLUJO GENERAL DEL USUARIO
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+■ ENTRADA DE USUARIO:
+  • El usuario entra en la página web de Alisys.
+  • Introduce una consulta inicial o necesidad sobre un servicio (Ejemplo: sistema de videovigilancia).
+
+■ AGENT MANAGER:
+  • Recibe la consulta del usuario.
+  • Selecciona al Base Agent para interactuar inicialmente.
+
+■ BASE AGENT:
+  • Responsabilidad: Clarificar necesidades específicas del usuario.
+  • Construcción del Prompt:
+    "Eres un asistente de Alisys. El usuario dice: '[consulta del usuario]'. 
+     Haz preguntas para entender mejor sus necesidades específicas."
+  • LLM: Genera preguntas de aclaración.
+  • Interacción con Usuario: Base Agent envía estas preguntas al usuario para obtener detalles adicionales.
+
+■ SELECCIÓN AUTOMÁTICA DE AGENTES ESPECÍFICOS:
+  • Selector de Agentes:
+    - El Agent Manager analiza la respuesta del usuario.
+    - En función del contexto, activa agentes específicos como Sales Agent e Engineering Agent.
+
+■ SALES AGENT:
+  • Responsabilidad: Convencer al usuario de elegir los servicios de Alisys.
+  • Construcción del Prompt:
+    "Eres un experto en ventas de Alisys. El usuario tiene [detalles obtenidos]. 
+     Proporciona recomendaciones técnicas específicas, ventajas comerciales y una propuesta preliminar."
+  • LLM: Genera una propuesta de ventas atractiva, destacando ventajas competitivas y beneficios del servicio.
+  • Interacción con Usuario: Sales Agent envía esta información para persuadir al usuario.
+
+■ ENGINEERING AGENT:
+  • Responsabilidad: Explicar técnicamente cómo se abordará el proyecto, dar estimados iniciales.
+  • Construcción del Prompt:
+    "Eres un ingeniero de Alisys. El usuario necesita [detalles técnicos del servicio requerido]. 
+     Proporciona una descripción técnica inicial sobre cómo se implementará el servicio y un estimado 
+     de horas para su implementación."
+  • LLM: Genera una explicación técnica clara y estimado de horas.
+  • Interacción con Usuario: Engineering Agent envía esta información técnica al usuario.
+
+■ FINALIZACIÓN DEL PROCESO CON PUSH UP:
+  • Push Up final:
+    - Después de que el usuario recibe las explicaciones técnica y comercial, aparece una ventana 
+      emergente o notificación.
+    - Esta ventana indica que un equipo de ingenieros de Alisys (nombrando algunos profesionales 
+      específicos) ya está trabajando en el análisis preliminar del proyecto.
+    - Se incluye claramente el estimado de horas inicial proporcionado por Engineering Agent y un mensaje como:
+      "Nuestro equipo ya está trabajando en tu proyecto. Tiempo estimado inicial: X horas. 
+       ¡Estamos comprometidos contigo!"
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                      DIAGRAMA COMPLETO DEL FLUJO                           ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────┐
+│  INTERFAZ USUARIO   │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   AGENT MANAGER     │
+└──────────┬──────────┘
+           │
+           ▼                                ┌─────────────────┐
+┌─────────────────────┐                     │                 │
+│ SELECTOR DE AGENTES ├────────────────────►│   BASE AGENT    ├───►CLARIFICACIÓN
+└──────────┬──────────┘                     │                 │
+           │                                └─────────────────┘
+           │
+           ▼                                ┌─────────────────┐
+┌─────────────────────┐                     │                 │
+│    SALES AGENT      ├────────────────────►│PROPUESTA        ├───►COMERCIAL
+└──────────┬──────────┘                     │                 │
+           │                                └─────────────────┘
+           ▼                                ┌─────────────────┐
+┌─────────────────────┐                     │EXPLICACIÓN      │
+│  ENGINEERING AGENT  ├────────────────────►│TÉCNICA Y        ├───►ESTIMADO
+└──────────┬──────────┘                     │                 │
+           │                                └─────────────────┘
+           ▼                                ┌─────────────────┐
+┌─────────────────────┐                     │CONFIRMACIÓN     │
+│   PUSH UP FINAL     ├────────────────────►│TRABAJO EQUIPO   ├───►Y ESTIMADO
+└─────────────────────┘                     │                 │
+                                            └─────────────────┘
+
+
+

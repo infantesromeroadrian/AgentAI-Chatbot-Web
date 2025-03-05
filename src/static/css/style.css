@@ -424,4 +424,263 @@ body {
         padding: 8px;
         font-size: 0.85em;
     }
+}
+
+/* Estilos para el badge del agente */
+.agent-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    margin-left: 10px;
+    border: 1px solid;
+    display: inline-flex;
+    align-items: center;
+}
+
+.agent-badge::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.agent-GeneralAgent::before {
+    background-color: #607D8B;
+}
+
+.agent-SalesAgent::before {
+    background-color: #2196F3;
+}
+
+.agent-EngineerAgent::before {
+    background-color: #FF9800;
+}
+
+.agent-DataCollectionAgent::before {
+    background-color: #9C27B0;
+}
+
+/* Colores específicos para cada agente */
+.agent-WelcomeAgent {
+    background-color: #4CAF50; /* Verde */
+}
+
+.agent-SalesAgent {
+    background-color: #2196F3; /* Azul */
+}
+
+.agent-EngineerAgent {
+    background-color: #FF9800; /* Naranja */
+}
+
+.agent-DataCollectionAgent {
+    background-color: #9C27B0; /* Púrpura */
+}
+
+.agent-GeneralAgent {
+    background-color: #607D8B; /* Gris azulado */
+}
+
+.mode-switch a.active {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+#agent-info-button {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px;
+    margin-left: 5px;
+    transition: color 0.3s ease;
+}
+
+#agent-info-button:hover {
+    color: var(--primary-color);
+}
+
+.agent-info-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.agent-info-content {
+    background-color: var(--bg-color);
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.agent-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.agent-info-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.agent-info-list {
+    list-style: none;
+    padding: 0;
+}
+
+.agent-info-item {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 5px;
+    border-left: 5px solid;
+}
+
+.agent-info-item h3 {
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+
+.agent-info-item p {
+    margin: 5px 0;
+}
+
+.agent-info-item.welcome {
+    border-left-color: #4CAF50;
+}
+
+.agent-info-item.sales {
+    border-left-color: #2196F3;
+}
+
+.agent-info-item.engineer {
+    border-left-color: #FF9800;
+}
+
+.agent-info-item.data-collection {
+    border-left-color: #9C27B0;
+}
+
+.agent-info-item.general {
+    border-left-color: #607D8B;
+}
+
+/* Estilos para los botones de selección de agente */
+.agent-selection-buttons {
+    margin-top: 15px;
+    padding: 10px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.agent-selection-title {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.agent-button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 20px;
+    background-color: var(--bg-color-secondary);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+}
+
+.agent-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.agent-button strong {
+    font-size: 14px;
+    margin-bottom: 3px;
+}
+
+.agent-button span {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+/* Estilos específicos para cada botón de agente */
+.agent-button-SalesAgent {
+    background-color: rgba(33, 150, 243, 0.2);
+    border: 1px solid #2196F3;
+}
+
+.agent-button-SalesAgent:hover {
+    background-color: rgba(33, 150, 243, 0.3);
+}
+
+.agent-button-EngineerAgent {
+    background-color: rgba(255, 152, 0, 0.2);
+    border: 1px solid #FF9800;
+}
+
+.agent-button-EngineerAgent:hover {
+    background-color: rgba(255, 152, 0, 0.3);
+}
+
+.agent-button-DataCollectionAgent {
+    background-color: rgba(156, 39, 176, 0.2);
+    border: 1px solid #9C27B0;
+}
+
+.agent-button-DataCollectionAgent:hover {
+    background-color: rgba(156, 39, 176, 0.3);
+}
+
+.agent-button-GeneralAgent {
+    background-color: rgba(96, 125, 139, 0.2);
+    border: 1px solid #607D8B;
+}
+
+.agent-button-GeneralAgent:hover {
+    background-color: rgba(96, 125, 139, 0.3);
+}
+
+/* Estilos para dispositivos móviles */
+@media (max-width: 768px) {
+    .agent-selection-buttons {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .agent-button {
+        width: 100%;
+    }
+}
+
+/* Clase para mensajes ocultos */
+.hidden {
+    display: none;
 } 
