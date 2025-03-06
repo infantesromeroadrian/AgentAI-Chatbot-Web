@@ -73,5 +73,14 @@
     "company": "bladecall",
     "interest": "No especificado",
     "timestamp": "2025-03-05T22:35:23.583458"
+  },
+  {
+    "message": "mi nombre es Chinchanpu Lopez, correo chinchanpulopez@gmail.com, mi telelfono es 620202020 y la empresa se llama Jaboncito",
+    "name": "Chinchanpu Lopez",
+    "email": "chinchanpulopez@gmail.com",
+    "company": "se llama Jaboncito",
+    "phone": "No proporcionado",
+    "interest": "No especificado",
+    "timestamp": "2025-03-06T14:25:59.843123"
   }
 ]
