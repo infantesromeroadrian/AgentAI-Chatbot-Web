@@ -263,13 +263,23 @@ Historial de conversación:
                 context['confirmed_previous_info'] = True
                 break
         
+        # Verificar si el mensaje contiene múltiples datos (mensaje completo)
+        # Si contiene al menos un correo electrónico y menciona la palabra "nombre", "teléfono" o "empresa"
+        contains_multiple_data = (
+            re.search(r"[\w\.-]+@[\w\.-]+\.\w+", message) and 
+            re.search(r"(nombre|telefono|teléfono|empresa|compañía|compania)", message, re.IGNORECASE)
+        )
+        
+        if contains_multiple_data:
+            logging.info("Mensaje detectado como conteniendo múltiples datos")
+        
         # Extraer nombre completo - Mejorado para detectar nombres simples
         if 'name' not in context['user_info'] or not context['user_info']['name']:
             # Primero intentar con patrones específicos
             name_patterns = [
-                r"(?:mi nombre es|me llamo|soy) ([A-Za-zÀ-ÖØ-öø-ÿ\s]+)",
-                r"([A-Za-zÀ-ÖØ-öø-ÿ\s]+) (?:es mi nombre|me llamo)",
-                r"nombre:?\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+)"
+                r"(?:mi nombre es|me llamo|soy) ([A-Za-zÀ-ÖØ-öø-ÿ\s]+?)(?:,|\.|y|mi|correo|email|telefono|teléfono|empresa|compañía|$)",
+                r"([A-Za-zÀ-ÖØ-öø-ÿ\s]+?) (?:es mi nombre|me llamo)",
+                r"nombre:?\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+?)(?:,|\.|y|mi|correo|email|telefono|teléfono|empresa|compañía|$)"
             ]
             
             for pattern in name_patterns:
@@ -282,7 +292,7 @@ Historial de conversación:
                         break
             
             # Si no se encontró con patrones específicos, intentar con un enfoque más simple
-            if 'name' not in extracted_info:
+            if 'name' not in extracted_info and not contains_multiple_data:
                 # Si el mensaje es corto y parece un nombre (sin caracteres especiales)
                 if len(message.split()) <= 4 and re.match(r'^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$', message.strip()):
                     name = message.strip()
@@ -310,10 +320,9 @@ Historial de conversación:
         if 'phone' not in context['user_info'] or not context['user_info']['phone']:
             # Patrones para números de teléfono
             phone_patterns = [
-                r"(?:mi teléfono|mi número|mi celular|mi móvil) (?:es)? (\+?[\d\s\(\)\-\.]{7,20})",
-                r"(\+?[\d\s\(\)\-\.]{7,20}) (?:es mi teléfono|es mi número|es mi celular|es mi móvil)",
-                r"teléfono:?\s*(\+?[\d\s\(\)\-\.]{7,20})",
-                r"(\+?[\d\s\(\)\-\.]{7,20})"  # Patrón genérico para números de teléfono
+                r"(?:mi teléfono|mi telefono|mi número|mi celular|mi móvil|teléfono|telefono) (?:es)? (\+?[\d\s\(\)\-\.]{7,20})",
+                r"(\+?[\d\s\(\)\-\.]{7,20}) (?:es mi teléfono|es mi telefono|es mi número|es mi celular|es mi móvil)",
+                r"(?:teléfono|telefono):?\s*(\+?[\d\s\(\)\-\.]{7,20})"
             ]
             
             for pattern in phone_patterns:
@@ -324,23 +333,32 @@ Historial de conversación:
                     digits = re.sub(r'\D', '', phone)
                     if len(digits) >= 7:
                         extracted_info['phone'] = phone
-                        logging.info(f"Teléfono extraído: {phone}")
+                        logging.info(f"Teléfono extraído con patrón específico: {phone}")
                         break
             
-            # Si el mensaje es solo un número de teléfono
+            # Si no se encontró con patrones específicos, buscar números en el mensaje
             if 'phone' not in extracted_info:
-                digits = re.sub(r'\D', '', message)
-                if len(digits) >= 7 and len(digits) <= 15:
-                    extracted_info['phone'] = message.strip()
-                    logging.info(f"Teléfono extraído como mensaje simple: {message.strip()}")
+                # Buscar secuencias de dígitos que parezcan números de teléfono
+                phone_matches = re.findall(r'(\d{7,15})', message.replace(" ", ""))
+                for match in phone_matches:
+                    if len(match) >= 7 and len(match) <= 15:
+                        extracted_info['phone'] = match
+                        logging.info(f"Teléfono extraído de secuencia de dígitos: {match}")
+                        break
+                
+                # Si el mensaje es solo un número de teléfono
+                if 'phone' not in extracted_info and not contains_multiple_data:
+                    digits = re.sub(r'\D', '', message)
+                    if len(digits) >= 7 and len(digits) <= 15:
+                        extracted_info['phone'] = message.strip()
+                        logging.info(f"Teléfono extraído como mensaje simple: {message.strip()}")
         
         # Extraer nombre de la empresa - Mejorado para detectar nombres de empresa simples
         if 'company' not in context['user_info'] or not context['user_info']['company']:
             company_patterns = [
-                r"(?:mi empresa|mi compañía|mi organización|trabajo para|trabajo en) (?:es|se llama)? ([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+)",
-                r"([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+) (?:es mi empresa|es mi compañía|es mi organización)",
-                r"empresa:?\s*([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+)",
-                r"compañía:?\s*([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+)"
+                r"(?:mi empresa|mi compañía|mi compania|mi organización|trabajo para|trabajo en) (?:es|se llama)? ([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+?)(?:,|\.|y|$)",
+                r"([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+?) (?:es mi empresa|es mi compañía|es mi compania|es mi organización)",
+                r"(?:empresa|compañía|compania):?\s*([A-Za-zÀ-ÖØ-öø-ÿ\s\&\.\,]+?)(?:,|\.|y|$)"
             ]
             
             for pattern in company_patterns:
@@ -349,16 +367,29 @@ Historial de conversación:
                     company = match.group(1).strip()
                     if len(company) > 2:  # Evitar coincidencias demasiado cortas
                         extracted_info['company'] = company
-                        logging.info(f"Empresa extraída: {company}")
+                        logging.info(f"Empresa extraída con patrón específico: {company}")
                         break
             
-            # Si el mensaje es corto y no se ha identificado como nombre o teléfono, podría ser el nombre de la empresa
-            if 'company' not in extracted_info and 'name' not in extracted_info and 'phone' not in extracted_info and 'email' not in extracted_info:
-                if len(message.split()) <= 5:
-                    company = message.strip()
-                    if len(company) > 2:
-                        extracted_info['company'] = company
-                        logging.info(f"Empresa extraída como mensaje simple: {company}")
+            # Si no se encontró con patrones específicos y el mensaje contiene múltiples datos
+            if 'company' not in extracted_info and contains_multiple_data:
+                # Buscar la última palabra o frase que no sea un email o número
+                words = message.split()
+                for i in range(len(words) - 1, -1, -1):
+                    if not re.match(r'[\w\.-]+@[\w\.-]+\.\w+', words[i]) and not re.match(r'\d+', words[i]):
+                        potential_company = words[i]
+                        if len(potential_company) > 2:
+                            extracted_info['company'] = potential_company
+                            logging.info(f"Empresa extraída de palabras finales: {potential_company}")
+                            break
+            
+            # Si el mensaje es corto y no se ha identificado como nombre, email o teléfono
+            if 'company' not in extracted_info and not contains_multiple_data:
+                if 'name' not in extracted_info and 'phone' not in extracted_info and 'email' not in extracted_info:
+                    if len(message.split()) <= 5:
+                        company = message.strip()
+                        if len(company) > 2:
+                            extracted_info['company'] = company
+                            logging.info(f"Empresa extraída como mensaje simple: {company}")
         
         # Actualizar el contexto con la información extraída
         if extracted_info:

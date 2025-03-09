@@ -6,6 +6,12 @@ let formFieldsCompleted = 0;
 let totalFormFields = 5; // Nombre, email, teléfono, empresa, área de interés
 let formFieldOrder = ['name', 'email', 'phone', 'company', 'interest']; // Orden de los campos
 let currentFieldIndex = 0;
+let formFields = [
+    { id: 'name', label: 'Nombre completo', placeholder: 'Ej. Juan Pérez', required: true },
+    { id: 'email', label: 'Correo electrónico', placeholder: 'Ej. juan@ejemplo.com', required: true },
+    { id: 'phone', label: 'Número de teléfono', placeholder: 'Ej. 612345678', required: true },
+    { id: 'company', label: 'Nombre de la empresa', placeholder: 'Ej. Empresa S.A.', required: true }
+];
 
 // Inicializar el chat con un mensaje de bienvenida
 document.addEventListener('DOMContentLoaded', function() {
@@ -193,8 +199,11 @@ function sendMessage(customMessage = null, hidden = false) {
                 agentBadge.style.borderColor = agentInfo.color;
                 messageHeader.appendChild(agentBadge);
                 
-                // Solo añadir botones de selección si estamos en modo agentes
-                if (useAgents) {
+                // Verificar si es el agente de recopilación de datos
+                const isDataCollectionAgent = checkIfDataCollectionAgent(data);
+                
+                // Solo añadir botones de selección si estamos en modo agentes y no es el agente de datos
+                if (useAgents && !isDataCollectionAgent) {
                     // Añadir botones de selección de agente después de la respuesta
                     addAgentSelectionButtons(messageContent);
                 }
@@ -477,8 +486,11 @@ function sendChatRequest(message) {
                 agentBadge.style.borderColor = agentInfo.color;
                 messageHeader.appendChild(agentBadge);
                 
-                // Solo añadir botones de selección si estamos en modo agentes
-                if (useAgents) {
+                // Verificar si es el agente de recopilación de datos
+                const isDataCollectionAgent = checkIfDataCollectionAgent(data);
+                
+                // Solo añadir botones de selección si estamos en modo agentes y no es el agente de datos
+                if (useAgents && !isDataCollectionAgent) {
                     // Añadir botones de selección de agente después de la respuesta
                     addAgentSelectionButtons(messageContent);
                 }
@@ -643,4 +655,108 @@ function addAgentSelectionButtons(container) {
     
     // Añadir los botones al contenedor
     container.appendChild(buttonsContainer);
+}
+
+// Función para mostrar el formulario visual
+function showContactForm() {
+    // Verificar si ya existe un formulario
+    if (document.getElementById('contact-form-container')) {
+        return;
+    }
+    
+    // Crear contenedor del formulario
+    const formContainer = document.createElement('div');
+    formContainer.id = 'contact-form-container';
+    formContainer.className = 'contact-form-container';
+    
+    // Crear título
+    const formTitle = document.createElement('h3');
+    formTitle.textContent = 'Formulario de contacto';
+    formContainer.appendChild(formTitle);
+    
+    // Crear descripción
+    const formDescription = document.createElement('p');
+    formDescription.textContent = 'Por favor, completa los siguientes campos para que podamos contactarte:';
+    formContainer.appendChild(formDescription);
+    
+    // Crear formulario
+    const form = document.createElement('form');
+    form.id = 'contact-form';
+    form.className = 'contact-form';
+    
+    // Añadir campos al formulario
+    formFields.forEach(field => {
+        const fieldContainer = document.createElement('div');
+        fieldContainer.className = 'form-field';
+        
+        const label = document.createElement('label');
+        label.htmlFor = field.id;
+        label.textContent = field.label + (field.required ? ' *' : '');
+        fieldContainer.appendChild(label);
+        
+        const input = document.createElement('input');
+        input.type = field.id === 'email' ? 'email' : 'text';
+        input.id = field.id;
+        input.name = field.id;
+        input.placeholder = field.placeholder;
+        input.required = field.required;
+        
+        // Si ya tenemos datos para este campo, rellenarlos
+        if (contactFormData[field.id]) {
+            input.value = contactFormData[field.id];
+        }
+        
+        fieldContainer.appendChild(input);
+        form.appendChild(fieldContainer);
+    });
+    
+    // Añadir botón de envío
+    const submitButton = document.createElement('button');
+    submitButton.type = 'submit';
+    submitButton.className = 'form-submit-button';
+    submitButton.textContent = 'Enviar información';
+    form.appendChild(submitButton);
+    
+    // Añadir evento de envío
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Recopilar datos del formulario
+        const formData = new FormData(form);
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
+            contactFormData[key] = value;
+        }
+        
+        // Construir mensaje con todos los datos
+        const message = `Mi nombre es ${data.name}, correo ${data.email}, teléfono ${data.phone}, empresa ${data.company}`;
+        
+        // Añadir mensaje del usuario
+        addUserMessage(message);
+        
+        // Enviar mensaje al servidor
+        submitCompleteFormMessage(message);
+        
+        // Ocultar formulario
+        formContainer.remove();
+    });
+    
+    formContainer.appendChild(form);
+    
+    // Añadir formulario al chat
+    document.getElementById('chat-container').appendChild(formContainer);
+    
+    // Hacer scroll hasta el formulario
+    document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+}
+
+// Modificar la función para detectar cuando mostrar el formulario
+function checkIfDataCollectionAgent(data) {
+    if (data.agent === 'DataCollectionAgent') {
+        // Si es el agente de recopilación de datos, mostrar el formulario
+        setTimeout(showContactForm, 1000); // Esperar 1 segundo para que se muestre el mensaje del agente
+        return true;
+    }
+    return false;
 } 

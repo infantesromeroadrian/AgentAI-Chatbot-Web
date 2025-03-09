@@ -683,4 +683,93 @@ body {
 /* Clase para mensajes ocultos */
 .hidden {
     display: none;
+}
+
+/* Estilos para el formulario de contacto */
+.contact-form-container {
+    background-color: var(--bg-color-secondary);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.contact-form-container h3 {
+    margin-top: 0;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+
+.contact-form-container p {
+    margin-bottom: 20px;
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.contact-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-field label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.form-field input {
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    transition: border-color 0.3s;
+}
+
+.form-field input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-submit-button {
+    padding: 10px 15px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+
+.form-submit-button:hover {
+    background-color: var(--secondary-color);
+}
+
+/* Estilos para dispositivos móviles */
+@media (max-width: 768px) {
+    .contact-form-container {
+        padding: 15px;
+    }
+    
+    .form-field input {
+        padding: 8px;
+    }
+    
+    .form-submit-button {
+        padding: 8px 12px;
+    }
 } 
