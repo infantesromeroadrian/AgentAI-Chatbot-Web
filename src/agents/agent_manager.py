@@ -19,6 +19,7 @@ class AgentManager:
         self.current_agent = None
         self.context = {
             'conversation_history': [],
+            'messages': [],
             'user_info': {},
             'project_info': {},
             'current_agent': None,
@@ -170,6 +171,10 @@ class AgentManager:
                     'content': full_response
                 })
                 
+                # Actualizar el contexto con información extraída por el agente
+                # Esto permite que los agentes compartan información entre sí
+                self._update_shared_context(working_context)
+                
                 return
         
         # Si no hay un agente específico o no se encontró, seleccionar uno
@@ -202,6 +207,35 @@ class AgentManager:
             'role': 'assistant',
             'content': full_response
         })
+        
+        # Actualizar el contexto con información extraída por el agente
+        # Esto permite que los agentes compartan información entre sí
+        self._update_shared_context(working_context)
+    
+    def _update_shared_context(self, context: Dict[str, Any]) -> None:
+        """
+        Actualiza el contexto compartido con información extraída por los agentes.
+        
+        Args:
+            context: Contexto actualizado por un agente
+        """
+        # Actualizar información del usuario
+        if 'user_info' in context and context['user_info']:
+            self.context['user_info'].update(context['user_info'])
+        
+        # Actualizar información del proyecto
+        if 'project_info' in context and context['project_info']:
+            self.context['project_info'].update(context['project_info'])
+        
+        # Actualizar historial de mensajes
+        if 'messages' in context and context['messages']:
+            self.context['messages'] = context['messages']
+        
+        # Actualizar agente actual y anterior
+        if 'current_agent' in context:
+            self.context['current_agent'] = context['current_agent']
+        if 'previous_agent' in context:
+            self.context['previous_agent'] = context['previous_agent']
     
     def reset(self) -> None:
         """

@@ -3,7 +3,7 @@ Define las rutas específicas para el sistema de agentes del chatbot.
 """
 import json
 import traceback
-from flask import request, jsonify, Response, stream_with_context, session, render_template
+from flask import request, jsonify, Response, stream_with_context, session, render_template, current_app
 from agents.agent_manager import AgentManager
 from agents.general_agent import GeneralAgent
 from agents.sales_agent import SalesAgent
@@ -114,12 +114,21 @@ def register_agent_routes(app):
         user_message = request.args.get('message', '')
         
         # Incrementar contador de mensajes
-        if 'message_count' not in session:
-            session['message_count'] = 0
-        session['message_count'] += 1
+        message_count = session.get('message_count', 0) + 1
+        session['message_count'] = message_count
         
         # Guardar el mensaje del usuario en la sesión
         session['last_user_message'] = user_message
+        
+        # Capturar valores de sesión actuales para usar en el generador
+        form_shown = session.get('form_shown', False)
+        form_active = session.get('form_active', False)
+        form_completed = session.get('form_completed', False)
+        current_agent_name = session.get('current_agent')
+        previous_agent_name = session.get('previous_agent')
+        user_info = session.get('user_info', {})
+        project_info = session.get('project_info', {})
+        messages = session.get('messages', [])
         
         # Verificar si es un mensaje especial para cambiar de agente
         if user_message.startswith('!cambiar_agente:'):
@@ -128,29 +137,30 @@ def register_agent_routes(app):
                 agent_id = user_message.split(':', 1)[1].strip()
                 
                 # Actualizar el agente actual y anterior en la sesión
-                session['previous_agent'] = session.get('current_agent')
+                session['previous_agent'] = current_agent_name
                 session['current_agent'] = agent_id
                 
                 # Registrar el cambio de agente
-                app.logger.info(f"Cambiando de agente: {session.get('previous_agent')} -> {agent_id}")
+                app.logger.info(f"Cambiando de agente: {previous_agent_name} -> {agent_id}")
                 
-                # Crear o actualizar el contexto para los agentes
+                # Crear contexto para los agentes
                 context = {
-                    'message_count': session.get('message_count', 0),
-                    'form_shown': session.get('form_shown', False),
-                    'form_active': session.get('form_active', False),
-                    'form_completed': session.get('form_completed', False),
-                    'last_user_message': session.get('last_user_message', ''),
+                    'message_count': message_count,
+                    'form_shown': form_shown,
+                    'form_active': form_active,
+                    'form_completed': form_completed,
+                    'last_user_message': user_message,
                     'current_agent': agent_id,
-                    'previous_agent': session.get('previous_agent', None),
-                    'user_info': session.get('user_info', {}),
-                    'project_info': session.get('project_info', {}),
-                    'messages': session.get('messages', [])
+                    'previous_agent': previous_agent_name,
+                    'user_info': user_info,
+                    'project_info': project_info,
+                    'messages': messages
                 }
                 
                 # Mensaje de continuación para el nuevo agente
                 continuation_message = "Por favor, continúa la conversación basándote en el contexto anterior."
                 
+                @stream_with_context
                 def agent_change_response():
                     # Mensaje de confirmación
                     confirmation = f"Ahora estás hablando con el agente: {agent_id.replace('Agent', '')}"
@@ -167,17 +177,9 @@ def register_agent_routes(app):
                                 yield f"data: {json.dumps({'token': chunk})}\n\n"
                             else:
                                 # Si no es una cadena, continuar
-                                app.logger.warning(f"Chunk no es una cadena: {type(chunk)}")
                                 continue
-                        
-                        # Actualizar la sesión con el contexto actualizado
-                        session['current_agent'] = context.get('current_agent')
-                        session['previous_agent'] = context.get('previous_agent')
-                        session['user_info'] = context.get('user_info', {})
-                        session['project_info'] = context.get('project_info', {})
-                        session['messages'] = context.get('messages', [])
                     except Exception as e:
-                        app.logger.error(f"Error al procesar mensaje de continuación: {str(e)}")
+                        current_app.logger.error(f"Error al procesar mensaje de continuación: {str(e)}")
                     
                     # Marcar como completado y enviar el nombre del agente
                     yield f"data: {json.dumps({'done': True, 'agent': agent_id})}\n\n"
@@ -202,130 +204,123 @@ def register_agent_routes(app):
             'informacion': 'GeneralAgent'
         }
         
-        # Verificar si el mensaje contiene una solicitud de cambio de agente
-        if user_message.lower().startswith(('con el agente', 'hablar con', 'cambiar a', 'quiero hablar con')):
-            for keyword, agent_id in agent_keywords.items():
-                if keyword in user_message.lower():
-                    # Actualizar el agente actual y anterior en la sesión
-                    session['previous_agent'] = session.get('current_agent')
-                    session['current_agent'] = agent_id
+        # Verificar si el mensaje contiene palabras clave para cambiar de agente
+        for keyword, agent_id in agent_keywords.items():
+            if keyword in user_message.lower() and f"cambiar a {keyword}" in user_message.lower():
+                # Actualizar el agente actual y anterior en la sesión
+                session['previous_agent'] = current_agent_name
+                session['current_agent'] = agent_id
+                
+                # Registrar el cambio de agente
+                app.logger.info(f"Cambiando de agente por palabra clave: {previous_agent_name} -> {agent_id}")
+                
+                # Crear contexto para los agentes
+                context = {
+                    'message_count': message_count,
+                    'form_shown': form_shown,
+                    'form_active': form_active,
+                    'form_completed': form_completed,
+                    'last_user_message': user_message,
+                    'current_agent': agent_id,
+                    'previous_agent': previous_agent_name,
+                    'user_info': user_info,
+                    'project_info': project_info,
+                    'messages': messages
+                }
+                
+                @stream_with_context
+                def keyword_agent_change_response():
+                    # Mensaje de confirmación
+                    confirmation = f"Cambiando al agente: {agent_id.replace('Agent', '')}"
+                    for char in confirmation:
+                        yield f"data: {json.dumps({'token': char})}\n\n"
                     
-                    # Registrar el cambio de agente
-                    app.logger.info(f"Cambiando de agente por texto: {session.get('previous_agent')} -> {agent_id}")
+                    # Procesar el mensaje con el gestor de agentes
+                    try:
+                        # Obtener la respuesta del gestor de agentes
+                        for chunk in agent_manager.process_message(user_message, context):
+                            # Verificar que el chunk es una cadena de texto
+                            if isinstance(chunk, str):
+                                # Formatear la respuesta para SSE
+                                yield f"data: {json.dumps({'token': chunk})}\n\n"
+                            else:
+                                # Si no es una cadena, continuar
+                                continue
+                    except Exception as e:
+                        current_app.logger.error(f"Error al procesar mensaje con cambio de agente por palabra clave: {str(e)}")
                     
-                    # Crear o actualizar el contexto para los agentes
-                    context = {
-                        'message_count': session.get('message_count', 0),
-                        'form_shown': session.get('form_shown', False),
-                        'form_active': session.get('form_active', False),
-                        'form_completed': session.get('form_completed', False),
-                        'last_user_message': session.get('last_user_message', ''),
-                        'current_agent': agent_id,
-                        'previous_agent': session.get('previous_agent', None),
-                        'user_info': session.get('user_info', {}),
-                        'project_info': session.get('project_info', {}),
-                        'messages': session.get('messages', [])
-                    }
-                    
-                    # Mensaje de continuación para el nuevo agente
-                    continuation_message = "Por favor, continúa la conversación basándote en el contexto anterior."
-                    
-                    def agent_change_text_response():
-                        # Mensaje de confirmación
-                        confirmation = f"Ahora estás hablando con el agente: {agent_id.replace('Agent', '')}"
-                        for char in confirmation:
-                            yield f"data: {json.dumps({'token': char})}\n\n"
-                        
-                        # Procesar un mensaje de continuación con el nuevo agente
-                        try:
-                            # Obtener la respuesta del nuevo agente
-                            for chunk in agent_manager.process_message(continuation_message, context):
-                                # Verificar que el chunk es una cadena de texto
-                                if isinstance(chunk, str):
-                                    # Formatear la respuesta para SSE
-                                    yield f"data: {json.dumps({'token': chunk})}\n\n"
-                                else:
-                                    # Si no es una cadena, continuar
-                                    app.logger.warning(f"Chunk no es una cadena: {type(chunk)}")
-                                    continue
-                            
-                            # Actualizar la sesión con el contexto actualizado
-                            session['current_agent'] = context.get('current_agent')
-                            session['previous_agent'] = context.get('previous_agent')
-                            session['user_info'] = context.get('user_info', {})
-                            session['project_info'] = context.get('project_info', {})
-                            session['messages'] = context.get('messages', [])
-                        except Exception as e:
-                            app.logger.error(f"Error al procesar mensaje de continuación: {str(e)}")
-                        
-                        # Marcar como completado y enviar el nombre del agente
-                        yield f"data: {json.dumps({'done': True, 'agent': agent_id})}\n\n"
-                    
-                    return Response(agent_change_text_response(), mimetype='text/event-stream')
+                    # Marcar como completado y enviar el nombre del agente
+                    yield f"data: {json.dumps({'done': True, 'agent': agent_id})}\n\n"
+                
+                return Response(keyword_agent_change_response(), mimetype='text/event-stream')
         
-        # Crear o actualizar el contexto para los agentes
+        # Si no es un mensaje para cambiar de agente, procesarlo normalmente
+        # Crear contexto para los agentes
         context = {
-            'message_count': session.get('message_count', 0),
-            'form_shown': session.get('form_shown', False),
-            'form_active': session.get('form_active', False),
-            'form_completed': session.get('form_completed', False),
-            'last_user_message': session.get('last_user_message', ''),
-            'current_agent': session.get('current_agent', None),
-            'previous_agent': session.get('previous_agent', None),
-            'user_info': session.get('user_info', {}),
-            'project_info': session.get('project_info', {}),
-            'messages': session.get('messages', [])
+            'message_count': message_count,
+            'form_shown': form_shown,
+            'form_active': form_active,
+            'form_completed': form_completed,
+            'last_user_message': user_message,
+            'current_agent': current_agent_name,
+            'previous_agent': previous_agent_name,
+            'user_info': user_info,
+            'project_info': project_info,
+            'messages': messages
         }
         
-        # Registrar el agente actual antes de procesar
-        app.logger.info(f"Procesando mensaje con agente: {context.get('current_agent')}")
+        # Procesar el mensaje y obtener la respuesta
+        # Capturar el resultado para actualizar la sesión después
+        result_context = {}
         
-        def process_with_agents():
+        @stream_with_context
+        def generate_response():
+            nonlocal result_context
             try:
-                # Obtener la respuesta del agente adecuado
+                # Procesar el mensaje con el gestor de agentes
                 for chunk in agent_manager.process_message(user_message, context):
                     # Verificar que el chunk es una cadena de texto
                     if isinstance(chunk, str):
                         # Formatear la respuesta para SSE
                         yield f"data: {json.dumps({'token': chunk})}\n\n"
                     else:
-                        # Si no es una cadena, convertirla a cadena
-                        app.logger.warning(f"Chunk no es una cadena: {type(chunk)}")
+                        # Si no es una cadena, continuar
                         continue
                 
-                # Obtener el nombre del agente actual
-                agent_name = context.get('current_agent', 'GeneralAgent')
-                
-                # Registrar el agente que respondió
-                app.logger.info(f"Respuesta generada por el agente: {agent_name}")
+                # Guardar el contexto actualizado para usarlo después
+                result_context = context.copy()
                 
                 # Marcar como completado y enviar el nombre del agente
-                yield f"data: {json.dumps({'done': True, 'agent': agent_name})}\n\n"
-                
-                # Actualizar la sesión con el contexto actualizado
-                session['current_agent'] = context.get('current_agent')
-                session['previous_agent'] = context.get('previous_agent')
-                session['user_info'] = context.get('user_info', {})
-                session['project_info'] = context.get('project_info', {})
-                
-                # Actualizar variables de formulario si fueron modificadas por los agentes
-                if 'form_completed' in context:
-                    session['form_completed'] = context['form_completed']
-                if 'form_shown' in context:
-                    session['form_shown'] = context['form_shown']
-                if 'form_active' in context:
-                    session['form_active'] = context['form_active']
-                
+                agent_id = context.get('current_agent', 'Unknown')
+                yield f"data: {json.dumps({'done': True, 'agent': agent_id})}\n\n"
             except Exception as e:
-                print(f"Error al procesar mensaje con agentes: {str(e)}")
+                current_app.logger.error(f"Error al procesar mensaje: {str(e)}")
                 traceback.print_exc()
-                yield f"data: {json.dumps({'token': 'Lo siento, ha ocurrido un error al procesar tu mensaje. Por favor, inténtalo de nuevo.'})}\n\n"
-                yield f"data: {json.dumps({'done': True, 'error': str(e)})}\n\n"
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
         
-        return Response(
-            stream_with_context(process_with_agents()), 
-            content_type='text/event-stream'
-        )
+        response = Response(generate_response(), mimetype='text/event-stream')
+        
+        # Configurar una función de cierre para actualizar la sesión después de que se complete la respuesta
+        @response.call_on_close
+        def on_close():
+            # Actualizar la sesión con el contexto actualizado
+            if result_context:
+                with app.app_context():
+                    with app.test_request_context():
+                        session['current_agent'] = result_context.get('current_agent')
+                        session['previous_agent'] = result_context.get('previous_agent')
+                        session['user_info'] = result_context.get('user_info', {})
+                        session['project_info'] = result_context.get('project_info', {})
+                        
+                        # Actualizar variables de formulario si fueron modificadas
+                        if 'form_completed' in result_context:
+                            session['form_completed'] = result_context['form_completed']
+                        if 'form_shown' in result_context:
+                            session['form_shown'] = result_context['form_shown']
+                        if 'form_active' in result_context:
+                            session['form_active'] = result_context['form_active']
+        
+        return response
     
     @app.route('/agent/reset', methods=['POST'])
     def agent_reset():
@@ -346,5 +341,5 @@ def register_agent_routes(app):
         
         return jsonify({
             "success": True,
-            "message": "Contexto de agentes reiniciado correctamente."
+            "message": "Contexto de agentes reiniciado correctamente"
         }) 
