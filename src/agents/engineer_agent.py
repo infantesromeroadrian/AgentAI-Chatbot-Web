@@ -41,7 +41,14 @@ class EngineerAgent(BaseAgent):
             "externa", "externas", "conectar", "conexión", "interfaz",
             "sistema", "plataforma", "software", "hardware", "infraestructura",
             "base de datos", "servidor", "cloud", "nube", "hosting",
-            "programación", "código", "algoritmo", "automatización"
+            "programación", "código", "algoritmo", "automatización",
+            # Palabras clave relacionadas con robótica
+            "robot", "robots", "robótica", "cuadrúpedo", "cuadrupedo",
+            "vigilancia", "seguridad", "patrullaje", "autónomo", "autonomo",
+            "detección", "sensor", "cámara", "camara", "visión", "vision",
+            "reconocimiento", "navegación", "navegacion", "batería", "bateria",
+            "recarga", "control remoto", "programación", "programacion",
+            "ruta", "rutas", "perímetro", "perimetro", "intrusos", "alarma"
         ]
         
         # Frases técnicas completas
@@ -52,7 +59,19 @@ class EngineerAgent(BaseAgent):
             "implementación técnica",
             "arquitectura de sistema",
             "optimización de procesos",
-            "automatización de tareas"
+            "automatización de tareas",
+            # Frases relacionadas con robótica
+            "robot cuadrúpedo",
+            "robot de vigilancia",
+            "sistema de seguridad",
+            "patrullaje autónomo",
+            "detección de intrusos",
+            "reconocimiento del entorno",
+            "navegación autónoma",
+            "control remoto",
+            "programación de rutas",
+            "integración con cámaras",
+            "integración con alarmas"
         ]
         
         # Verificar si el mensaje contiene alguna palabra clave técnica
@@ -106,17 +125,6 @@ INSTRUCCIONES:
 8. Después de proporcionar información técnica detallada, sugiere al usuario hablar con el agente de Ventas para obtener una cotización personalizada con un mensaje como: "Ahora que conoces los detalles técnicos, ¿te gustaría hablar con nuestro agente de Ventas para obtener una cotización personalizada para tu proyecto?"
 9. Si el usuario muestra interés en adquirir el servicio o solicita información de precios, sugiere explícitamente cambiar al agente de Ventas.
 10. Recuerda que tu función principal es proporcionar información técnica, no cotizaciones o precios específicos.
-
-INFORMACIÓN ESPECÍFICA SOBRE INTEGRACIÓN DE APIS PARA CALL CENTERS:
-- Cuando el usuario pregunte sobre integración de APIs para call centers, proporciona información detallada sobre:
-  * APIs específicas de Alisys para call centers (REST, SOAP, WebSockets)
-  * Capacidades de integración con CRMs, ERPs y otras plataformas de gestión
-  * Opciones de integración con sistemas de telefonía IP, VoIP y PBX
-  * Automatización de flujos de llamadas mediante APIs
-  * Integración con sistemas de análisis de voz y sentiment analysis
-  * Opciones para webhooks y callbacks en tiempo real
-  * Seguridad y autenticación en las integraciones de APIs
-  * Ejemplos concretos de casos de uso para call centers
 
 FLUJO DE CONVERSACIÓN RECOMENDADO:
 1. Proporciona detalles técnicos y estimaciones de tiempo → Sugiere cambiar al agente de Ventas para cotización → El agente de Ventas sugerirá cambiar al agente de Datos para finalizar el proceso.
