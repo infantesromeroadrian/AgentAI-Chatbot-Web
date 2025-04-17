@@ -116,7 +116,10 @@ class BaseAgent(ABC):
         
         # Generar la respuesta utilizando el LLM
         try:
-            for chunk in self._generate_response(system_prompt, message):
+            # Aplicar ajustes basados en el análisis de sentimiento
+            adjusted_system_prompt = self._adjust_prompt_for_sentiment(system_prompt, context)
+            
+            for chunk in self._generate_response(adjusted_system_prompt, message):
                 full_response += chunk
                 yield chunk
             
@@ -190,4 +193,61 @@ class BaseAgent(ABC):
             content = message.get('content', '')
             formatted_history += f"{role.capitalize()}: {content}\n"
         
-        return formatted_history 
+        return formatted_history
+
+    def _adjust_prompt_for_sentiment(self, system_prompt: str, context: Dict[str, Any]) -> str:
+        """
+        Ajusta el prompt del sistema según el análisis de sentimiento del mensaje.
+        
+        Args:
+            system_prompt: Prompt original del sistema
+            context: Contexto de la conversación
+            
+        Returns:
+            Prompt ajustado
+        """
+        # Verificar si hay análisis de sentimiento en el contexto
+        if 'current_sentiment' not in context:
+            return system_prompt
+            
+        sentiment = context['current_sentiment']
+        
+        # Obtener emoción dominante y polaridad
+        dominant_emotion = sentiment.get('dominant_emotion')
+        polarity = sentiment.get('polarity', 0)
+        urgency = sentiment.get('urgency', 0)
+        
+        # Generar instrucciones adicionales basadas en el sentimiento
+        sentiment_instructions = []
+        
+        if dominant_emotion:
+            if dominant_emotion == 'alegria':
+                sentiment_instructions.append("El usuario muestra un tono positivo. Mantén un tono animado y refuerza esta actitud positiva.")
+            elif dominant_emotion == 'tristeza':
+                sentiment_instructions.append("El usuario muestra un tono triste o decepcionado. Usa un tono empático y comprensivo.")
+            elif dominant_emotion == 'enojo':
+                sentiment_instructions.append("El usuario muestra frustración o enojo. Mantén la calma, no uses un tono defensivo y centra tu respuesta en soluciones concretas.")
+            elif dominant_emotion == 'miedo':
+                sentiment_instructions.append("El usuario muestra preocupación o ansiedad. Usa un tono tranquilizador y ofrece información clara y precisa.")
+            elif dominant_emotion == 'confusión':
+                sentiment_instructions.append("El usuario muestra confusión. Estructura tu respuesta de manera clara y simple, evitando términos técnicos innecesarios.")
+        
+        # Verificar polaridad
+        if polarity < -0.5:
+            sentiment_instructions.append("El usuario muestra una actitud muy negativa. Enfoca tu respuesta en ofrecer soluciones concretas y alternativas.")
+        elif polarity > 0.5:
+            sentiment_instructions.append("El usuario muestra una actitud muy positiva. Refuerza esta actitud en tu respuesta.")
+        
+        # Verificar urgencia
+        if urgency > 0.7:
+            sentiment_instructions.append("El usuario muestra urgencia en su consulta. Prioriza la eficiencia en tu respuesta y ofrece soluciones inmediatas cuando sea posible.")
+        
+        # Si no hay instrucciones específicas, no modificar el prompt
+        if not sentiment_instructions:
+            return system_prompt
+        
+        # Agregar instrucciones al prompt original
+        sentiment_block = "\n\nINSTRUCCIONES ADICIONALES BASADAS EN EL SENTIMIENTO DEL USUARIO:\n"
+        sentiment_block += "\n".join(f"- {instruction}" for instruction in sentiment_instructions)
+        
+        return system_prompt + sentiment_block 

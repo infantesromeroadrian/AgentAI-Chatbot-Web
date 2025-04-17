@@ -5,7 +5,11 @@ para manejar cada mensaje basado en su contenido y contexto.
 """
 import re
 import unicodedata
+import logging
 from typing import Dict, List, Any, Optional
+
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 # Palabras clave asociadas a cada tipo de agente
 INTENT_KEYWORDS = {
@@ -23,7 +27,9 @@ INTENT_KEYWORDS = {
         'propuesta', 'comercial', 'venta', 'cotización', 'cotizacion', 'contrato',
         'facturación', 'facturacion', 'paquete', 'suscripción', 'suscripcion', 'precios',
         'promoción', 'promocion', 'pago', 'dinero', 'euros', 'cuesta', 'costar', 'valor',
-        'económico', 'economico', 'costes', 'mensualidad', 'anualidad', 'financiación', 'financiacion'
+        'económico', 'economico', 'costes', 'mensualidad', 'anualidad', 'financiación', 'financiacion',
+        'cotizar', 'precio', 'costará', 'costara', 'costo', 'vale', 'valer', 'interesado en',
+        'proforma', 'comprar', 'adquirir', 'contratar'
     ],
     'DataCollectionAgent': [
         'formulario', 'datos', 'contacto', 'email', 'teléfono', 'telefono',
@@ -31,7 +37,7 @@ INTENT_KEYWORDS = {
         'representante', 'asesor', 'registrar', 'visita', 'reunión', 'reunion',
         'demo', 'demostración', 'demostracion', 'prueba', 'gratuita', 'trial',
         'correo', 'dirección', 'direccion', 'móvil', 'movil', 'celular', 'whatsapp',
-        'contactar', 'comunicar', 'comunicarse', 'interesado', 'me interesa'
+        'contactar', 'comunicar', 'comunicarse', 'interesado'
     ],
     'GeneralAgent': [
         'hola', 'información', 'informacion', 'ayuda', 'servicio', 'solución', 'solucion',
@@ -53,14 +59,18 @@ INTENT_PHRASES = {
     'SalesAgent': [
         'cuánto cuesta', 'cuanto cuesta', 'qué precio tiene', 'que precio tiene',
         'tienen descuentos', 'hay promociones', 'formas de pago', 'métodos de pago',
-        'metodos de pago', 'planes disponibles', 'quiero contratar', 'quiero comprar'
+        'metodos de pago', 'planes disponibles', 'quiero contratar', 'quiero comprar',
+        'estoy interesado en cotizar', 'necesito cotizar', 'quiero una cotización',
+        'quiero cotización', 'quiero cotizacion', 'pueden cotizar', 'me gustaría cotizar',
+        'precio para', 'costo de', 'interesado en comprar', 'interesado en contratar',
+        'interesado en adquirir', 'cuanto me costaría', 'quiero una propuesta comercial'
     ],
     'DataCollectionAgent': [
         'quiero que me contacten', 'me gustaría hablar con un representante',
         'me gustaria hablar con un representante', 'pueden llamarme',
         'quiero una demostración', 'quiero una demostracion',
         'necesito que me contacte un asesor', 'mi correo es', 'mi email es',
-        'mi teléfono es', 'mi telefono es', 'mis datos son'
+        'mi teléfono es', 'mi telefono es', 'mis datos son', 'quiero dejar mis datos'
     ]
 }
 
@@ -104,7 +114,7 @@ def classify_intent(message: str, context: Optional[Dict[str, Any]] = None) -> D
         'GeneralAgent': 0.2,  # Mayor prioridad base para el agente general
         'SalesAgent': 0.1,
         'EngineerAgent': 0.1,
-        'DataCollectionAgent': 0.1
+        'DataCollectionAgent': 0.05  # Menor prioridad base para el agente de datos
     }
     
     # Incrementar puntuación por palabras clave encontradas
@@ -113,13 +123,20 @@ def classify_intent(message: str, context: Optional[Dict[str, Any]] = None) -> D
             # Verificar si la palabra clave está presente como palabra completa
             keyword_pattern = r'\b' + re.escape(keyword) + r'\b'
             if re.search(keyword_pattern, normalized_message):
-                scores[agent_type] += 0.15
+                # Dar peso especial a palabras relacionadas con cotizaciones para el agente de ventas
+                if agent_type == 'SalesAgent' and keyword in ['cotizar', 'cotización', 'cotizacion', 'precio', 'costo']:
+                    scores[agent_type] += 0.25  # Mayor peso para términos de ventas críticos
+                else:
+                    scores[agent_type] += 0.15
     
     # Incrementar puntuación por frases específicas (mayor peso)
     for agent_type, phrases in INTENT_PHRASES.items():
         for phrase in phrases:
             if normalize_text(phrase) in normalized_message:
-                scores[agent_type] += 0.25
+                if agent_type == 'SalesAgent':
+                    scores[agent_type] += 0.35  # Mayor peso para frases de ventas
+                else:
+                    scores[agent_type] += 0.25
     
     # Analizar el contexto de la conversación si está disponible
     if context:
@@ -180,6 +197,24 @@ def apply_context_adjustments(scores: Dict[str, float], message: str, context: D
     if user_info and not context.get('form_completed', False):
         # Si ya tenemos algunos datos pero no todos, favorecer recolección de datos
         scores['DataCollectionAgent'] += 0.15
+        
+    # Detectar términos de cotización para evitar que los maneje el DataCollectionAgent
+    cotization_terms = ["cotizar", "cotización", "cotizacion", "presupuesto", 
+                         "precio", "costo", "cuánto cuesta", "cuanto vale"]
+    
+    if any(term in normalized_message for term in cotization_terms):
+        # Aumentar puntuación del SalesAgent
+        scores['SalesAgent'] += 0.25
+        # Reducir puntuación del DataCollectionAgent para estos casos
+        scores['DataCollectionAgent'] -= 0.2
+        logger.debug("Términos de cotización detectados, favoreciendo SalesAgent sobre DataCollectionAgent")
+    
+    # Si hay una mención explícita de "call center" o "contact center" junto a términos de precio
+    if ('call center' in normalized_message or 'contact center' in normalized_message) and \
+       any(term in normalized_message for term in cotization_terms):
+        scores['SalesAgent'] += 0.3
+        scores['DataCollectionAgent'] -= 0.15
+        logger.debug("Consulta sobre precios de call center detectada, priorizando SalesAgent")
     
     return scores
 

@@ -5,6 +5,9 @@ cotizaciones para los servicios de Alisys.
 """
 from typing import Dict, List, Any, Optional
 from .base_agent import BaseAgent
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SalesAgent(BaseAgent):
     """
@@ -32,17 +35,34 @@ class SalesAgent(BaseAgent):
         Returns:
             Confianza ajustada
         """
+        # Normalizar mensaje para búsquedas
+        normalized_message = message.lower()
+        
         # Si el mensaje contiene palabras muy específicas de ventas, aumentar aún más la confianza
         high_sales_indicators = [
             "cotización", "cotizar", "presupuesto", "cuánto cuesta", "cuanto vale",
-            "descuento", "oferta", "promoción", "contrato", "presupuestar"
+            "descuento", "oferta", "promoción", "contrato", "presupuestar",
+            "precio", "costo", "valor", "pagar", "interesado en cotizar"
         ]
         
         # Verificar palabras clave de alta prioridad
         for indicator in high_sales_indicators:
-            if indicator in message.lower():
-                base_confidence += 0.15
+            if indicator in normalized_message:
+                base_confidence += 0.25  # Aumentado de 0.15 a 0.25
+                logger.info(f"Término de ventas crítico detectado en mensaje: '{indicator}'")
                 break  # Aplicar solo una vez este bonus
+        
+        # Verificación aún más específica para términos relacionados con cotizaciones
+        cotization_terms = ["cotizar", "cotización", "cotizacion", "presupuesto"]
+        if any(term in normalized_message for term in cotization_terms):
+            base_confidence += 0.25  # Bonus adicional para términos de cotización
+            logger.info(f"Término explícito de cotización detectado en mensaje")
+        
+        # Si contiene la palabra 'call center' o 'contact center' y está relacionado con precio
+        if ('call center' in normalized_message or 'contact center' in normalized_message) and \
+           any(term in normalized_message for term in ['precio', 'costo', 'cotizar', 'cotización']):
+            base_confidence += 0.3
+            logger.info(f"Consulta sobre precios de call center detectada")
         
         # Si el agente anterior fue el ingeniero, es probable que ahora necesiten cotizar
         if context.get('previous_agent') == "EngineerAgent":
@@ -58,8 +78,18 @@ class SalesAgent(BaseAgent):
         
         # Si el usuario pregunta por un plan específico que mencionamos antes
         plan_keywords = ["plan básico", "plan básico", "plan estándar", "plan premium"]
-        if any(plan in message.lower() for plan in plan_keywords):
+        if any(plan in normalized_message for plan in plan_keywords):
             base_confidence += 0.25
+            
+        # Penalizar si el mensaje parece ser solo para dejar datos sin pedir información de precios
+        data_only_patterns = [
+            "mis datos son", "mi correo es", "mi teléfono es", "mi telefono es",
+            "mi nombre es", "mi empresa es", "pueden contactarme"
+        ]
+        if any(pattern in normalized_message for pattern in data_only_patterns) and \
+           not any(term in normalized_message for term in high_sales_indicators):
+            base_confidence -= 0.2
+            logger.info(f"Mensaje parece ser solo para dejar datos, reduciendo confianza")
         
         return min(base_confidence, 1.0)  # Limitar a 1.0
     
