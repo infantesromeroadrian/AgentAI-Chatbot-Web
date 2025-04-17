@@ -10,14 +10,12 @@ from agents.sales_agent import SalesAgent
 from agents.engineer_agent import EngineerAgent
 from agents.data_collection_agent import DataCollectionAgent
 
-# Inicializar el gestor de agentes para las rutas específicas
+# Inicializar el gestor de agentes y registrar los agentes
 agent_manager = AgentManager()
-
-# Registrar los agentes disponibles
-agent_manager.register_agent(GeneralAgent())
-agent_manager.register_agent(SalesAgent())
-agent_manager.register_agent(EngineerAgent())
-agent_manager.register_agent(DataCollectionAgent())
+agent_manager.register_agent(GeneralAgent())     # Primera prioridad para bienvenida e información general
+agent_manager.register_agent(SalesAgent())       # Alta prioridad para ventas  
+agent_manager.register_agent(EngineerAgent())    # Alta prioridad para consultas técnicas
+agent_manager.register_agent(DataCollectionAgent()) # Última prioridad para recopilar datos
 
 def register_agent_routes(app):
     """Registra las rutas específicas para el sistema de agentes"""

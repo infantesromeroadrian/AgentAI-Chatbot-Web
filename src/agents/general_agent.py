@@ -33,6 +33,19 @@ class GeneralAgent(BaseAgent):
         Returns:
             Confianza ajustada
         """
+        message_lower = message.lower()
+        
+        # Detectar explícitamente preguntas sobre servicios e información 
+        service_info_patterns = [
+            'qué servicios', 'que servicios', 'qué ofrece', 'que ofrece',
+            'qué hace', 'que hace', 'información sobre', 'informacion sobre',
+            'cuáles son', 'cuales son', 'qué es', 'que es'
+        ]
+        
+        # Si es una pregunta específica sobre servicios, garantizar alta confianza
+        if any(pattern in message_lower for pattern in service_info_patterns):
+            return 0.95  # Prioridad casi máxima para preguntas de información
+        
         # El agente general tiene una prioridad base más alta para mensajes cortos
         if len(message) < 15:
             base_confidence += 0.1
@@ -47,8 +60,12 @@ class GeneralAgent(BaseAgent):
         
         # Si contiene saludos o preguntas muy generales, aumentar confianza
         greeting_words = ['hola', 'buenos dias', 'buenas tardes', 'saludos', 'hello']
-        if any(greeting in message.lower() for greeting in greeting_words):
+        if any(greeting in message_lower for greeting in greeting_words):
             base_confidence += 0.2
+            
+        # Si contiene signos de interrogación, probablemente sea una consulta informativa
+        if '?' in message:
+            base_confidence += 0.15
         
         return min(base_confidence, 1.0)  # Limitar a 1.0
     

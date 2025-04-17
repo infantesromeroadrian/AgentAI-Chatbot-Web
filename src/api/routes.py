@@ -21,11 +21,11 @@ data_manager = DataManager()
 # Inicializar el gestor de agentes
 agent_manager = AgentManager()
 
-# Registrar los agentes disponibles
-agent_manager.register_agent(GeneralAgent())
-agent_manager.register_agent(SalesAgent())
-agent_manager.register_agent(EngineerAgent())
-agent_manager.register_agent(DataCollectionAgent())
+# Registrar los agentes disponibles - El orden determina la prioridad
+agent_manager.register_agent(GeneralAgent())     # Primera prioridad para bienvenida e información general
+agent_manager.register_agent(SalesAgent())       # Alta prioridad para ventas
+agent_manager.register_agent(EngineerAgent())    # Alta prioridad para consultas técnicas
+agent_manager.register_agent(DataCollectionAgent()) # Última prioridad para recopilar datos
 
 def register_routes(app):
     """Registra todas las rutas de la aplicación"""

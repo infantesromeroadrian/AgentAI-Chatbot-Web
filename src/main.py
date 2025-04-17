@@ -11,6 +11,8 @@ from typing import Dict, Any, Optional
 from agents.agent_manager import AgentManager
 from agents.general_agent import GeneralAgent
 from agents.sales_agent import SalesAgent
+from agents.engineer_agent import EngineerAgent
+from agents.data_collection_agent import DataCollectionAgent
 from utils.context_manager import ContextPersistenceManager
 from utils.sentiment_analyzer import SentimentAnalyzer
 
@@ -36,10 +38,11 @@ def setup_agent_manager() -> AgentManager:
     # Crear gestor de agentes
     manager = AgentManager()
     
-    # Registrar agentes disponibles
-    manager.register_agent(GeneralAgent())
-    manager.register_agent(SalesAgent())
-    # Aquí se pueden registrar más agentes según sea necesario
+    # Registrar agentes disponibles - el orden determina la prioridad
+    manager.register_agent(GeneralAgent())     # Primera prioridad para bienvenida e información general
+    manager.register_agent(SalesAgent())       # Alta prioridad para ventas
+    manager.register_agent(EngineerAgent())    # Alta prioridad para consultas técnicas
+    manager.register_agent(DataCollectionAgent()) # Última prioridad para recopilar datos
     
     logger.info("Gestor de agentes configurado correctamente")
     return manager

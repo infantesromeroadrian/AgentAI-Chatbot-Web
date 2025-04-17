@@ -13,6 +13,37 @@ let formFields = [
     { id: 'company', label: 'Nombre de la empresa', placeholder: 'Ej. Empresa S.A.', required: true }
 ];
 
+// Añadir variables globales para nuevas funcionalidades
+let currentAgent = "GeneralAgent";
+let recognition = null;
+let isListening = false;
+let suggestedQuestionsPool = {
+    "GeneralAgent": [
+        "¿Qué servicios ofrece Alisys?",
+        "¿Cómo funciona el servicio de Contact Center?",
+        "¿Qué ventajas tiene usar Alisys?",
+        "¿Tienen algún caso de éxito que pueda consultar?"
+    ],
+    "SalesAgent": [
+        "¿Cuánto cuesta implementar un Contact Center?",
+        "¿Tienen diferentes planes?",
+        "¿Ofrecen descuentos por volumen?",
+        "¿Puedo obtener una cotización personalizada?"
+    ],
+    "EngineerAgent": [
+        "¿Cómo se integra con mi CRM actual?",
+        "¿Qué tecnologías utilizan?",
+        "¿Cuáles son los requisitos técnicos?",
+        "¿Es compatible con mi infraestructura?"
+    ],
+    "DataCollectionAgent": [
+        "Quiero que me contacte un asesor",
+        "Prefiero dejar mis datos para que me llamen",
+        "Necesito una demostración personalizada",
+        "¿Puedo programar una reunión virtual?"
+    ]
+};
+
 // Inicializar el chat con un mensaje de bienvenida
 document.addEventListener('DOMContentLoaded', function() {
     addBotMessage("¡Hola! Soy el asistente virtual de Alisys. ¿En qué puedo ayudarte hoy?");
@@ -55,7 +86,181 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+    
+    // Inicializar reconocimiento de voz si está disponible
+    setupSpeechRecognition();
+    
+    // Crear botón de retroalimentación de voz
+    createVoiceFeedbackButton();
 });
+
+// Configura el reconocimiento de voz si está disponible en el navegador
+function setupSpeechRecognition() {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onresult = function(event) {
+            const speechResult = event.results[0][0].transcript;
+            document.getElementById('user-input').value = speechResult;
+            
+            // Enviar mensaje automáticamente después de una breve pausa
+            setTimeout(function() {
+                sendMessage();
+            }, 500);
+        };
+        
+        recognition.onend = function() {
+            isListening = false;
+            updateVoiceFeedbackState();
+        };
+        
+        recognition.onerror = function(event) {
+            console.error('Error en reconocimiento de voz:', event.error);
+            isListening = false;
+            updateVoiceFeedbackState();
+        };
+    }
+}
+
+// Crea un botón flotante para la entrada de voz
+function createVoiceFeedbackButton() {
+    if (recognition) {
+        const voiceButton = document.createElement('div');
+        voiceButton.className = 'voice-feedback';
+        voiceButton.innerHTML = '<i class="fas fa-microphone"></i>';
+        voiceButton.title = 'Habla para enviar un mensaje';
+        
+        voiceButton.addEventListener('click', function() {
+            if (!isListening) {
+                try {
+                    recognition.start();
+                    isListening = true;
+                } catch (e) {
+                    console.error('Error al iniciar reconocimiento:', e);
+                }
+            } else {
+                recognition.stop();
+                isListening = false;
+            }
+            updateVoiceFeedbackState();
+        });
+        
+        document.body.appendChild(voiceButton);
+    }
+}
+
+// Actualiza el estado visual del botón de voz
+function updateVoiceFeedbackState() {
+    const voiceButton = document.querySelector('.voice-feedback');
+    if (voiceButton) {
+        if (isListening) {
+            voiceButton.classList.add('listening');
+            voiceButton.title = 'Haz clic para detener';
+        } else {
+            voiceButton.classList.remove('listening');
+            voiceButton.title = 'Habla para enviar un mensaje';
+        }
+    }
+}
+
+// Actualiza el indicador de agente actual
+function updateCurrentAgentIndicator(agentId) {
+    if (!useAgents) return;
+    
+    const indicator = document.getElementById('current-agent-indicator');
+    const nameElement = document.getElementById('current-agent-name');
+    
+    if (indicator && nameElement) {
+        const agentInfo = agentsInfo[agentId] || { 
+            name: agentId.replace('Agent', ''), 
+            color: '#607D8B',
+            icon: 'fas fa-user-circle'
+        };
+        
+        nameElement.textContent = agentInfo.name;
+        indicator.style.backgroundColor = agentInfo.color + '20';  // Color con transparencia
+        indicator.style.borderColor = agentInfo.color;
+        
+        // Actualizar icono
+        const iconElement = indicator.querySelector('.agent-icon');
+        if (iconElement) {
+            iconElement.className = `${agentInfo.icon} agent-icon`;
+        }
+        
+        // Guardar agente actual para futuros usos
+        currentAgent = agentId;
+        
+        // Actualizar sugerencias basadas en el agente actual
+        updateSuggestionChips(agentId);
+    }
+}
+
+// Actualiza las sugerencias de consulta según el agente actual
+function updateSuggestionChips(agentId) {
+    const suggestionsContainer = document.getElementById('suggestion-chips');
+    if (!suggestionsContainer) return;
+    
+    // Limpiar sugerencias actuales
+    suggestionsContainer.innerHTML = '';
+    
+    // Obtener sugerencias para el agente actual
+    const suggestions = suggestedQuestionsPool[agentId] || suggestedQuestionsPool['GeneralAgent'];
+    
+    // Añadir nuevas sugerencias
+    suggestions.forEach(suggestion => {
+        const chip = document.createElement('div');
+        chip.className = 'suggestion-chip';
+        chip.textContent = suggestion;
+        chip.onclick = function() {
+            sendMessage(suggestion);
+        };
+        suggestionsContainer.appendChild(chip);
+    });
+    
+    // Mostrar el contenedor de sugerencias
+    suggestionsContainer.style.display = 'flex';
+}
+
+// Añadir función para indicador de escritura
+function showTypingIndicator() {
+    const chatContainer = document.getElementById('chat-container');
+    
+    // Crear indicador de escritura
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'message bot-message typing-message';
+    typingDiv.id = 'typing-indicator';
+    
+    const messageHeader = document.createElement('div');
+    messageHeader.className = 'message-header';
+    
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar bot-avatar';
+    avatar.innerHTML = '<i class="fas fa-robot"></i>';
+    
+    messageHeader.appendChild(avatar);
+    typingDiv.appendChild(messageHeader);
+    
+    const typingIndicator = document.createElement('div');
+    typingIndicator.className = 'typing-indicator';
+    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+    typingDiv.appendChild(typingIndicator);
+    
+    // Añadir al chat
+    chatContainer.appendChild(typingDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// Eliminar indicador de escritura
+function removeTypingIndicator() {
+    const typingIndicator = document.getElementById('typing-indicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
+}
 
 function sendMessage(customMessage = null, hidden = false) {
     const userInput = document.getElementById('user-input');
@@ -141,6 +346,9 @@ function sendMessage(customMessage = null, hidden = false) {
     addUserMessage(message);
     userInput.value = '';
     
+    // Mostrar indicador de escritura mientras se procesa la respuesta
+    showTypingIndicator();
+    
     // Preparar para respuesta del bot
     currentResponseElement = document.createElement('div');
     currentResponseElement.className = 'message bot-message';
@@ -159,9 +367,10 @@ function sendMessage(customMessage = null, hidden = false) {
     messageContent.className = 'message-content markdown';
     currentResponseElement.appendChild(messageContent);
     
-    // Solo añadir al chat si no es un mensaje oculto
-    if (!hidden) {
-        document.getElementById('chat-container').appendChild(currentResponseElement);
+    // Ocultar las sugerencias mientras el bot responde
+    const suggestionsContainer = document.getElementById('suggestion-chips');
+    if (suggestionsContainer) {
+        suggestionsContainer.style.display = 'none';
     }
     
     // Usar streaming para la respuesta
@@ -174,6 +383,15 @@ function sendMessage(customMessage = null, hidden = false) {
         if (data.done) {
             // Finalizar streaming
             eventSource.close();
+            
+            // Quitar indicador de escritura
+            removeTypingIndicator();
+            
+            // Solo añadir al chat si no es un mensaje oculto
+            if (!hidden) {
+                document.getElementById('chat-container').appendChild(currentResponseElement);
+            }
+            
             document.getElementById('thinking').style.display = 'none';
             document.getElementById('status-indicator').className = 'status-indicator status-connected';
             document.getElementById('status').textContent = 'Conectado';
@@ -189,15 +407,19 @@ function sendMessage(customMessage = null, hidden = false) {
                 const agentId = data.agent;
                 const agentInfo = agentsInfo[agentId] || { 
                     name: agentId.replace('Agent', ''), 
-                    color: '#607D8B' 
+                    color: '#607D8B',
+                    icon: 'fas fa-user-circle'
                 };
                 
                 const agentBadge = document.createElement('div');
                 agentBadge.className = `agent-badge agent-${agentId}`;
-                agentBadge.textContent = `Agente: ${agentInfo.name}`;
+                agentBadge.innerHTML = `<i class="${agentInfo.icon}"></i> ${agentInfo.name}`;
                 agentBadge.style.backgroundColor = agentInfo.color + '20'; // Añadir transparencia
                 agentBadge.style.borderColor = agentInfo.color;
                 messageHeader.appendChild(agentBadge);
+                
+                // Actualizar el indicador de agente actual
+                updateCurrentAgentIndicator(agentId);
                 
                 // Verificar si es el agente de recopilación de datos
                 const isDataCollectionAgent = checkIfDataCollectionAgent(data);
@@ -214,8 +436,18 @@ function sendMessage(customMessage = null, hidden = false) {
                 formActive = false;
                 submitContactForm();
             }
+            
+            // Mostrar sugerencias basadas en el agente actual
+            updateSuggestionChips(currentAgent);
+            suggestionsContainer.style.display = 'flex';
         } else if (data.error) {
             // Mostrar error
+            removeTypingIndicator(); // Quitar indicador de escritura
+            
+            if (!hidden) {
+                document.getElementById('chat-container').appendChild(currentResponseElement);
+            }
+            
             messageContent.textContent = 'Error: ' + data.error;
             currentResponseElement.className = 'message error-message';
             eventSource.close();
@@ -227,6 +459,15 @@ function sendMessage(customMessage = null, hidden = false) {
         } else if (data.token) {
             // Agregar token a la respuesta
             fullResponse += data.token;
+            
+            // Si es el primer token, reemplazar el indicador de escritura
+            if (fullResponse.length === data.token.length) {
+                removeTypingIndicator();
+                if (!hidden) {
+                    document.getElementById('chat-container').appendChild(currentResponseElement);
+                }
+            }
+            
             // Actualizar con renderizado parcial de markdown
             messageContent.innerHTML = marked.parse(fullResponse);
             document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
@@ -250,29 +491,25 @@ function sendMessage(customMessage = null, hidden = false) {
                     document.getElementById('user-input').classList.remove('highlight-input');
                 }, 1500);
                 
-                // Enfocar el input
-                document.getElementById('user-input').focus();
-                
-                // Mostrar mensaje de ayuda destacado
-                const helpMessage = document.createElement('div');
-                helpMessage.className = 'form-help-message';
-                helpMessage.innerHTML = `<i class="fas fa-info-circle"></i> Por favor, escribe tu <strong>${fieldLabel}</strong> y presiona Enter`;
-                messageContent.appendChild(helpMessage);
+                // Ocultar sugerencias durante entrada de formulario
+                suggestionsContainer.style.display = 'none';
             }
         }
     };
     
     eventSource.onerror = function() {
         eventSource.close();
-        if (messageContent.textContent === '') {
-            messageContent.textContent = 'Error: No se pudo conectar con el servidor.';
-            currentResponseElement.className = 'message error-message';
-        }
+        removeTypingIndicator();
         document.getElementById('thinking').style.display = 'none';
         document.getElementById('status-indicator').className = 'status-indicator status-disconnected';
-        document.getElementById('status').textContent = 'Error de conexión';
+        document.getElementById('status').textContent = 'Desconectado';
         document.getElementById('user-input').disabled = false;
         document.getElementById('send-button').disabled = false;
+        
+        // Mostrar mensaje de error solo si no se mostró ya un mensaje
+        if (fullResponse === '') {
+            addBotMessage("Lo siento, ha ocurrido un error de conexión. Por favor, intenta de nuevo más tarde.");
+        }
     };
 }
 

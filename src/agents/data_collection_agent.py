@@ -36,64 +36,70 @@ class DataCollectionAgent(BaseAgent):
         Returns:
             True si el agente puede manejar el mensaje, False en caso contrario
         """
-        # Palabras clave relacionadas con contacto
-        contact_keywords = [
-            "contacto", "contactar", "llamar", "llamada", "email",
-            "correo", "teléfono", "telefono", "celular", "móvil",
-            "información de contacto", "datos de contacto", "formulario",
-            "representante", "asesor", "comercial", "ventas", "cotización",
-            "cotizar", "presupuesto", "información", "nombre", "empresa"
-        ]
-        
-        # Frases que indican intención de contacto
-        contact_phrases = [
-            "me gustaría recibir una cotización",
-            "quiero que me contacten",
-            "necesito hablar con un representante",
-            "me gustaría más información",
-            "pueden contactarme",
-            "me interesa contratar",
-            "quisiera que me llamen",
-            "necesito asesoría"
-        ]
-        
-        # Verificar si el mensaje contiene alguna palabra clave de contacto
+        # Si el mensaje es una pregunta sobre servicios o información general, rechazar explícitamente
         message_lower = message.lower()
         
-        # Verificar palabras clave
-        for keyword in contact_keywords:
-            if keyword in message_lower:
-                return True
+        # Patrones de preguntas sobre servicios o información general que NO debe manejar
+        info_question_patterns = [
+            "qué servicios", "que servicios", 
+            "qué ofrece", "que ofrece",
+            "qué hace", "que hace",
+            "información sobre", "informacion sobre",
+            "cuáles son", "cuales son",
+            "qué es", "que es"
+        ]
         
-        # Verificar frases completas
-        for phrase in contact_phrases:
-            if phrase in message_lower:
-                return True
+        # Si parece ser una pregunta sobre servicios, rechazar explícitamente
+        for pattern in info_question_patterns:
+            if pattern in message_lower:
+                return False
+        
+        # Si contiene signos de interrogación, probablemente sea una consulta informativa
+        if "?" in message:
+            # Solo aceptar preguntas relacionadas explícitamente con contacto
+            contact_question_patterns = [
+                "contactar", "llamar", "email", "formulario", "datos"
+            ]
+            has_contact_question = any(pattern in message_lower for pattern in contact_question_patterns)
+            if not has_contact_question:
+                return False
         
         # Verificar si ya se ha mostrado el formulario pero no se ha completado
         if context.get('form_shown', False) and not context.get('form_completed', False):
             return True
-            
-        # Verificar si el mensaje contiene datos de contacto (nombre, email, teléfono)
-        if self._contains_contact_data(message):
+        
+        # Verificar si el mensaje contiene datos de contacto concretos (email, teléfono)
+        has_contact_data = self._contains_contact_data(message)
+        
+        # Frases que indican intención explícita de contacto
+        contact_phrases = [
+            "quiero que me contacten",
+            "me gustaría hablar con un representante",
+            "necesito hablar con un asesor",
+            "pueden contactarme",
+            "me gustaría dejar mis datos",
+            "quiero un formulario de contacto"
+        ]
+        
+        # Verificar frases completas (match exacto o casi exacto)
+        explicit_contact_intent = False
+        for phrase in contact_phrases:
+            if phrase in message_lower:
+                explicit_contact_intent = True
+                break
+        
+        # Si el usuario está explícitamente proporcionando datos o solicitando contacto
+        if has_contact_data or explicit_contact_intent:
             return True
         
-        # También manejar si el contexto indica que estamos en fase de recopilación de datos
+        # Si ya estamos en proceso de recopilación (el agente actual es este)
         if context.get('current_agent') == self.name:
-            return True
+            # Solo mantener si estamos a mitad de un proceso de recopilación
+            if context.get('form_active', False):
+                return True
         
-        # O si el agente anterior fue el de ventas o ingeniería y el usuario mostró interés
-        previous_agent = context.get('previous_agent')
-        if previous_agent in ["SalesAgent", "EngineerAgent"]:
-            interest_keywords = ["interesado", "me interesa", "quiero", "deseo", "necesito", "contactar"]
-            for keyword in interest_keywords:
-                if keyword in message_lower:
-                    return True
-        
-        # O si ya tenemos algunos datos de contacto pero faltan campos
-        if context.get('user_info') and not self._has_all_required_fields(context.get('user_info', {})):
-            return True
-        
+        # Por defecto, este agente sólo debería activarse cuando explícitamente
+        # se necesite recopilar información de contacto
         return False
     
     def get_system_prompt(self, context: Dict[str, Any]) -> str:
@@ -113,6 +119,9 @@ class DataCollectionAgent(BaseAgent):
         # Crear un resumen de la información ya recopilada para el prompt
         collected_info_summary = self._format_user_info(user_info)
         
+        # Verificar si es la primera vez que este agente interactúa
+        is_first_interaction = context.get('current_agent') != self.name
+        
         # Crear instrucciones específicas basadas en el estado actual
         specific_instructions = ""
         
@@ -124,7 +133,17 @@ Muestra un resumen de toda la información recopilada para que el usuario pueda 
         else:
             # Si es la primera interacción o hay múltiples campos faltantes
             if len(missing_fields) > 1:
-                specific_instructions = f"""
+                if is_first_interaction:
+                    specific_instructions = f"""
+IMPORTANTE: Al ser la primera interacción con el usuario, PRIMERO EXPLICA CLARAMENTE que:
+1. Estás cambiando al agente de recopilación de datos porque has detectado interés en los servicios
+2. Para proporcionar una propuesta personalizada, necesitas algunos datos básicos
+3. Esta información es confidencial y solo se usará para contactar al usuario
+
+LUEGO solicita TODOS los datos pendientes de una sola vez para agilizar el proceso. Los campos que necesitamos son: {', '.join(missing_fields)}.
+"""
+                else:
+                    specific_instructions = f"""
 Solicita TODOS los datos pendientes de una sola vez para agilizar el proceso. Los campos que necesitamos son: {', '.join(missing_fields)}.
 Explica claramente que necesitas esta información para que un representante pueda contactar al usuario con una propuesta personalizada.
 Sé amable pero directo, y menciona que esta información es confidencial y solo se utilizará para contactar al usuario.

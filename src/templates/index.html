@@ -36,6 +36,113 @@
             background-color: var(--secondary-color);
             color: white;
         }
+        
+        /* Nuevos estilos para mejoras de accesibilidad */
+        .accessibility-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .accessibility-button {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--bg-color-secondary);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--text-color);
+        }
+        
+        .accessibility-button:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .accessibility-menu {
+            display: none;
+            position: absolute;
+            top: 46px;
+            left: 0;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 12px;
+            min-width: 220px;
+            z-index: 1000;
+        }
+        
+        .accessibility-menu h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: var(--primary-color);
+        }
+        
+        .accessibility-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .accessibility-option label {
+            margin-left: 8px;
+            font-size: 14px;
+        }
+        
+        /* Estilos para chat sugerencias */
+        .suggestion-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .suggestion-chip {
+            background-color: var(--bg-color-secondary);
+            color: var(--primary-color);
+            padding: 8px 12px;
+            border-radius: 18px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid var(--light-color);
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .suggestion-chip:hover {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        /* Mejora para indicador de agente activo */
+        .current-agent-indicator {
+            position: absolute;
+            top: 10px;
+            right: 180px;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            background-color: var(--light-color);
+            transition: all 0.3s ease;
+        }
+        
+        .current-agent-indicator .agent-icon {
+            margin-right: 5px;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -43,6 +150,36 @@
         <div class="header">
             <i class="fas fa-robot" style="font-size: 28px; color: var(--secondary-color);"></i>
             <h1>Alisys ChatBot</h1>
+            
+            <!-- Panel de accesibilidad -->
+            <div class="accessibility-panel">
+                <button id="accessibility-toggle" class="accessibility-button" title="Opciones de accesibilidad">
+                    <i class="fas fa-universal-access"></i>
+                </button>
+                <div id="accessibility-menu" class="accessibility-menu">
+                    <h3>Opciones de accesibilidad</h3>
+                    <div class="accessibility-option">
+                        <input type="checkbox" id="high-contrast" name="high-contrast">
+                        <label for="high-contrast">Alto contraste</label>
+                    </div>
+                    <div class="accessibility-option">
+                        <input type="checkbox" id="larger-text" name="larger-text">
+                        <label for="larger-text">Texto más grande</label>
+                    </div>
+                    <div class="accessibility-option">
+                        <input type="checkbox" id="reduce-motion" name="reduce-motion">
+                        <label for="reduce-motion">Reducir movimiento</label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Indicador de agente actual -->
+            {% if use_agents %}
+            <div id="current-agent-indicator" class="current-agent-indicator">
+                <i class="fas fa-user-circle agent-icon"></i>
+                <span id="current-agent-name">General</span>
+            </div>
+            {% endif %}
             
             <div class="mode-switch">
                 <span>Modo:</span>
@@ -63,6 +200,14 @@
             <button id="send-button" onclick="sendMessage()" aria-label="Enviar mensaje">
                 <i class="fas fa-paper-plane"></i>
             </button>
+        </div>
+        
+        <!-- Chips de sugerencias iniciales -->
+        <div id="suggestion-chips" class="suggestion-chips">
+            <div class="suggestion-chip" onclick="sendMessage('¿Qué servicios ofrece Alisys?')">¿Qué servicios ofrece Alisys?</div>
+            <div class="suggestion-chip" onclick="sendMessage('Necesito una cotización')">Necesito una cotización</div>
+            <div class="suggestion-chip" onclick="sendMessage('Quiero hablar con un técnico')">Quiero hablar con un técnico</div>
+            <div class="suggestion-chip" onclick="sendMessage('Quiero dejar mis datos de contacto')">Quiero dejar mis datos de contacto</div>
         </div>
         
         <div class="status-bar">
@@ -90,24 +235,100 @@
             "GeneralAgent": {
                 "name": "General",
                 "description": "Información general sobre Alisys",
-                "color": "#607D8B"
+                "color": "#607D8B",
+                "icon": "fas fa-info-circle"
             },
             "SalesAgent": {
                 "name": "Ventas",
                 "description": "Información sobre productos y servicios",
-                "color": "#2196F3"
+                "color": "#2196F3",
+                "icon": "fas fa-shopping-cart"
             },
             "EngineerAgent": {
                 "name": "Técnico",
                 "description": "Soporte técnico y detalles de implementación",
-                "color": "#FF9800"
+                "color": "#FF9800",
+                "icon": "fas fa-cogs"
             },
             "DataCollectionAgent": {
                 "name": "Datos",
                 "description": "Recopilación de información de contacto",
-                "color": "#9C27B0"
+                "color": "#9C27B0",
+                "icon": "fas fa-address-book"
             }
         };
+        
+        // Configurar menú de accesibilidad
+        document.addEventListener('DOMContentLoaded', function() {
+            const accessibilityToggle = document.getElementById('accessibility-toggle');
+            const accessibilityMenu = document.getElementById('accessibility-menu');
+            
+            if (accessibilityToggle && accessibilityMenu) {
+                accessibilityToggle.addEventListener('click', function() {
+                    if (accessibilityMenu.style.display === 'block') {
+                        accessibilityMenu.style.display = 'none';
+                    } else {
+                        accessibilityMenu.style.display = 'block';
+                    }
+                });
+                
+                // Cerrar al hacer clic fuera
+                document.addEventListener('click', function(event) {
+                    if (!accessibilityToggle.contains(event.target) && !accessibilityMenu.contains(event.target)) {
+                        accessibilityMenu.style.display = 'none';
+                    }
+                });
+                
+                // Aplicar configuraciones
+                const highContrast = document.getElementById('high-contrast');
+                const largerText = document.getElementById('larger-text');
+                const reduceMotion = document.getElementById('reduce-motion');
+                
+                // Cargar configuraciones guardadas
+                if (localStorage.getItem('high-contrast') === 'true') {
+                    highContrast.checked = true;
+                    document.body.classList.add('high-contrast');
+                }
+                
+                if (localStorage.getItem('larger-text') === 'true') {
+                    largerText.checked = true;
+                    document.body.classList.add('larger-text');
+                }
+                
+                if (localStorage.getItem('reduce-motion') === 'true') {
+                    reduceMotion.checked = true;
+                    document.body.classList.add('reduce-motion');
+                }
+                
+                // Guardar cambios
+                highContrast.addEventListener('change', function() {
+                    localStorage.setItem('high-contrast', this.checked);
+                    if (this.checked) {
+                        document.body.classList.add('high-contrast');
+                    } else {
+                        document.body.classList.remove('high-contrast');
+                    }
+                });
+                
+                largerText.addEventListener('change', function() {
+                    localStorage.setItem('larger-text', this.checked);
+                    if (this.checked) {
+                        document.body.classList.add('larger-text');
+                    } else {
+                        document.body.classList.remove('larger-text');
+                    }
+                });
+                
+                reduceMotion.addEventListener('change', function() {
+                    localStorage.setItem('reduce-motion', this.checked);
+                    if (this.checked) {
+                        document.body.classList.add('reduce-motion');
+                    } else {
+                        document.body.classList.remove('reduce-motion');
+                    }
+                });
+            }
+        });
     </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     

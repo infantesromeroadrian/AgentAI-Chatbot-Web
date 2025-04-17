@@ -39,10 +39,10 @@ def setup_agent_system() -> AgentManager:
     # El orden de registro es importante, ya que determina el orden de prioridad
     # Los agentes se evalúan en el orden en que se registran
     # El primero que puede manejar el mensaje es el que se selecciona
-    agent_manager.register_agent(data_collection_agent)  # Máxima prioridad para recopilar datos
-    agent_manager.register_agent(sales_agent)  # Alta prioridad para ventas
-    agent_manager.register_agent(engineer_agent)  # Alta prioridad para consultas técnicas
-    agent_manager.register_agent(welcome_agent)  # Baja prioridad, agente por defecto
+    agent_manager.register_agent(welcome_agent)    # Primera prioridad para bienvenida y preguntas generales
+    agent_manager.register_agent(sales_agent)      # Alta prioridad para ventas
+    agent_manager.register_agent(engineer_agent)   # Alta prioridad para consultas técnicas
+    agent_manager.register_agent(data_collection_agent)  # Última prioridad para recopilar datos
     
     logger.info("Sistema de agentes inicializado correctamente")
     

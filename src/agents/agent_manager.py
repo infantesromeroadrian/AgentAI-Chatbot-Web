@@ -65,66 +65,95 @@ class AgentManager:
         Returns:
             El agente seleccionado o None si no hay agentes disponibles
         """
-        # Usar el contexto proporcionado o el interno
-        working_context = context if context is not None else self.context
+        # Inicializar contexto si no existe
+        if context is None:
+            context = {}
         
-        # Si no hay agentes registrados, devolver None
-        if not self.agents:
-            logger.warning("No hay agentes registrados para seleccionar")
-            return None
+        # Detección rápida de preguntas sobre servicios o información general
+        message_lower = message.lower()
+        service_info_patterns = [
+            'qué servicios', 'que servicios', 'qué ofrece', 'que ofrece',
+            'qué hace', 'que hace', 'información sobre', 'informacion sobre',
+            'cuáles son', 'cuales son', 'qué es', 'que es'
+        ]
         
-        # Si solo hay un agente, devolverlo
-        if len(self.agents) == 1:
-            logger.info(f"Solo hay un agente disponible: {self.agents[0].name}")
-            return self.agents[0]
+        # Si es una pregunta sobre servicios, forzar el uso del GeneralAgent
+        is_service_question = any(pattern in message_lower for pattern in service_info_patterns)
+        if is_service_question:
+            for agent in self.agents:
+                if agent.__class__.__name__ == 'GeneralAgent':
+                    logger.info("Pregunta sobre servicios detectada, utilizando GeneralAgent")
+                    return agent
         
         # Verificar si hay una solicitud explícita de cambio de agente
-        # Esta es la prioridad más alta, siempre debe respetarse
-        explicit_agent_name = detect_agent_change_keywords(message)
-        if explicit_agent_name:
-            agent = self._get_agent_by_name(explicit_agent_name)
-            if agent:
-                logger.info(f"Cambio explícito de agente solicitado: {explicit_agent_name}")
-                self._update_agent_selection(agent, 1.0, working_context, "Solicitud explícita del usuario")
-                return agent
-            else:
-                logger.warning(f"Se solicitó el agente {explicit_agent_name} pero no está disponible")
-                # Si se solicitó un agente que no existe, continuar con el proceso normal
+        explicit_agent = detect_agent_change_keywords(message)
+        if explicit_agent:
+            for agent in self.agents:
+                if agent.__class__.__name__ == explicit_agent:
+                    logger.info(f"Cambio explícito al agente: {explicit_agent}")
+                    # Actualizar el historial con el cambio de agente
+                    if 'history' in context:
+                        context['history'].append({
+                            'message': message,
+                            'agent': explicit_agent,
+                            'confidence': 1.0,
+                            'reason': 'Selección explícita del usuario'
+                        })
+                    return agent
         
-        # Para respuestas cortas como "sí", "no", etc., mantener el agente actual
-        if len(message.strip()) <= 5:
-            current_agent_name = working_context.get('current_agent')
-            current_agent = self._get_agent_by_name(current_agent_name)
-            if current_agent:
-                logger.info(f"Mensaje corto, manteniendo agente actual: {current_agent.name}")
-                self._update_agent_selection(current_agent, 0.8, working_context, "Mensaje corto")
-                return current_agent
+        # Calcular puntuaciones de confianza para cada agente
+        agent_scores = {}
+        for agent in self.agents:
+            agent_name = agent.__class__.__name__
+            confidence = agent.can_handle(message, context)
+            agent_scores[agent_name] = confidence
+            logger.debug(f"Agente {agent_name}: puntuación {confidence}")
         
-        # Intentar obtener agente por nombre específico en el contexto
-        current_agent_name = working_context.get('current_agent')
-        if current_agent_name:
-            current_agent = self._get_agent_by_name(current_agent_name)
-            # Verificar si el agente actual puede seguir manejando el mensaje
-            if current_agent:
-                confidence = current_agent.can_handle(message, working_context)
-                if confidence >= 0.5:  # Umbral para mantener el mismo agente
-                    logger.info(f"Manteniendo el agente actual: {current_agent.name} con confianza {confidence:.2f}")
-                    self._update_agent_selection(current_agent, confidence, working_context, "Continuidad de conversación")
-                    return current_agent
+        # Encontrar el agente con la mayor puntuación
+        max_confidence = -1
+        selected_agent = None
+        selected_agent_name = None
         
-        # Seleccionar el mejor agente basado en confianza
-        best_agent, best_confidence = self._select_agent_with_highest_confidence(message, working_context)
+        # Umbrales específicos por agente (más alto para DataCollectionAgent)
+        thresholds = {
+            'DataCollectionAgent': 0.95,  # Umbral extremadamente alto para recolección de datos
+            'SalesAgent': 0.6,
+            'EngineerAgent': 0.6,
+            'GeneralAgent': 0.4   # El GeneralAgent puede tener un umbral más bajo
+        }
         
-        if best_agent and best_confidence > 0.3:  # Umbral mínimo de confianza
-            logger.info(f"Mejor agente seleccionado: {best_agent.name} con confianza {best_confidence:.2f}")
-            self._update_agent_selection(best_agent, best_confidence, working_context, "Mayor confianza")
-            return best_agent
+        for agent in self.agents:
+            agent_name = agent.__class__.__name__
+            confidence = agent_scores.get(agent_name, 0)
+            
+            # Obtener umbral específico o usar valor predeterminado
+            threshold = thresholds.get(agent_name, 0.5)
+            
+            if confidence > max_confidence and confidence >= threshold:
+                max_confidence = confidence
+                selected_agent = agent
+                selected_agent_name = agent_name
         
-        # Si ningún agente supera el umbral, usar el agente de fallback
-        fallback = self._get_fallback_agent()
-        logger.info(f"Usando agente de fallback: {fallback.name}")
-        self._update_agent_selection(fallback, 0.2, working_context, "Fallback por baja confianza")
-        return fallback
+        # Si ningún agente supera su umbral, usar el agente de respaldo (GeneralAgent)
+        if not selected_agent:
+            logger.info("Ningún agente supera el umbral. Usando agente de respaldo.")
+            for agent in self.agents:
+                if agent.__class__.__name__ == 'GeneralAgent':
+                    selected_agent = agent
+                    selected_agent_name = 'GeneralAgent'
+                    break
+        
+        # Registrar la selección para el historial
+        if 'history' in context and selected_agent_name:
+            context['history'].append({
+                'message': message,
+                'agent': selected_agent_name,
+                'confidence': max_confidence,
+                'reason': 'Selección automática por puntuación'
+            })
+        
+        logger.info(f"Agente seleccionado: {selected_agent_name} con confianza {max_confidence}")
+        return selected_agent
     
     def _update_agent_selection(self, agent: BaseAgent, confidence: float, context: Dict[str, Any], reason: str) -> None:
         """

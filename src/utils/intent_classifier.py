@@ -111,11 +111,26 @@ def classify_intent(message: str, context: Optional[Dict[str, Any]] = None) -> D
     
     # Inicializar puntuaciones con valor base
     scores = {
-        'GeneralAgent': 0.2,  # Mayor prioridad base para el agente general
+        'GeneralAgent': 0.4,  # Prioridad base aún más alta para el agente general
         'SalesAgent': 0.1,
         'EngineerAgent': 0.1,
-        'DataCollectionAgent': 0.05  # Menor prioridad base para el agente de datos
+        'DataCollectionAgent': 0.0  # Iniciar con cero para forzar que solo sea activado explícitamente
     }
+    
+    # Verificar primero si es una pregunta sobre servicios o información general
+    service_info_patterns = [
+        'qué servicios', 'que servicios', 'qué ofrece', 'que ofrece',
+        'qué hace', 'que hace', 'información sobre', 'informacion sobre',
+        'cuáles son', 'cuales son', 'qué es', 'que es'
+    ]
+    
+    # Si es una pregunta sobre servicios, dar alta prioridad al GeneralAgent inmediatamente
+    if any(pattern in normalized_message for pattern in service_info_patterns):
+        scores['GeneralAgent'] += 0.6
+        scores['DataCollectionAgent'] = 0.0  # Asegurar que no se active para preguntas de información
+        # Incluso podemos cortar el procesamiento aquí y devolver scores
+        if '?' in message:
+            return scores
     
     # Incrementar puntuación por palabras clave encontradas
     for agent_type, keywords in INTENT_KEYWORDS.items():
@@ -149,74 +164,72 @@ def classify_intent(message: str, context: Optional[Dict[str, Any]] = None) -> D
     
     return scores
 
-def apply_context_adjustments(scores: Dict[str, float], message: str, context: Dict[str, Any]) -> Dict[str, float]:
+def apply_context_adjustments(agent_scores, user_message, context):
     """
-    Aplica ajustes a las puntuaciones basados en el contexto de la conversación.
-    
-    Args:
-        scores: Puntuaciones actuales para cada tipo de agente
-        message: Mensaje del usuario
-        context: Contexto de la conversación
-        
-    Returns:
-        Puntuaciones ajustadas
+    Ajusta las puntuaciones de los agentes basándose en el contexto de la conversación.
     """
-    # Normalizar mensaje para búsquedas posteriores
-    normalized_message = normalize_text(message)
+    message_normalized = user_message.lower()
     
-    # Verificar el historial de mensajes
-    message_count = context.get('message_count', 0)
-    current_agent = context.get('current_agent')
+    # Reducir significativamente el peso base del DataCollectionAgent para evitar
+    # que capture consultas generales
+    if 'DataCollectionAgent' in agent_scores:
+        agent_scores['DataCollectionAgent'] *= 0.4  # Reducción más agresiva
     
-    # Primeros mensajes: favorecer al agente general para presentaciones
-    if message_count <= 2:
-        scores['GeneralAgent'] += 0.1
+    # 1. Verificar consultas de información general que deben ir al GeneralAgent
+    general_info_patterns = [
+        '¿qué', 'que', '¿cuál', 'cual', '¿cómo', 'como', 
+        'servicios', 'ofrecen', 'ofrece', 'about', 'acerca'
+    ]
     
-    # Si hay un agente actual, darle algo de preferencia para mantener continuidad
-    if current_agent and current_agent in scores:
-        scores[current_agent] += 0.15
+    is_info_query = any(pattern in message_normalized for pattern in general_info_patterns)
+    if is_info_query and len(message_normalized.split()) < 15:
+        # Es probablemente una consulta de información
+        if 'GeneralAgent' in agent_scores:
+            agent_scores['GeneralAgent'] += 0.3  # Aumentar más
+        if 'DataCollectionAgent' in agent_scores:
+            agent_scores['DataCollectionAgent'] -= 0.7  # Reducir más agresivamente
     
-    # Si el formulario ha sido mostrado pero no completado, favorecer recolección de datos
-    if context.get('form_shown', False) and not context.get('form_completed', False):
-        scores['DataCollectionAgent'] += 0.2
+    # 2. Verificar si es un mensaje corto o inicial
+    if len(message_normalized.split()) <= 3:
+        # Mensajes muy cortos generalmente son mejor manejados por el agente general
+        if 'GeneralAgent' in agent_scores:
+            agent_scores['GeneralAgent'] += 0.25  # Aumentar más
+        if 'DataCollectionAgent' in agent_scores:
+            agent_scores['DataCollectionAgent'] -= 0.5  # Reducir más
     
-    # Mensaje corto (como "sí", "ok", "no"): mantener el mismo agente
-    if len(message) <= 5 and current_agent:
-        scores[current_agent] += 0.3
+    # 3. Detectar explícitamente solicitudes de cotización para SalesAgent
+    quote_terms = ['cotizar', 'cotización', 'precio', 'costo', 'valor', 'planes', 'oferta']
+    if any(term in message_normalized for term in quote_terms):
+        if 'SalesAgent' in agent_scores:
+            agent_scores['SalesAgent'] += 0.5  # Prioridad alta
+        if 'DataCollectionAgent' in agent_scores:
+            agent_scores['DataCollectionAgent'] -= 0.4  # Reducir
     
-    # Detectar preguntas directas (qué, cómo, cuándo, dónde, por qué)
-    question_words = ['que', 'qué', 'como', 'cómo', 'cuando', 'cuándo', 
-                      'donde', 'dónde', 'por que', 'por qué', 'cual', 'cuál']
+    # 4. Detectar explícitamente solicitudes de demostración o contacto
+    contact_terms = ['contactar', 'llamar', 'contacto', 'teléfono', 'email', 'correo']
+    demo_terms = ['demostración', 'demo', 'probar', 'prueba']
     
-    if any(normalize_text(question).strip() in normalized_message.split() for question in question_words):
-        # Preguntas generales suelen manejarse mejor por el agente general
-        scores['GeneralAgent'] += 0.1
+    is_contact_request = any(term in message_normalized for term in contact_terms)
+    is_demo_request = any(term in message_normalized for term in demo_terms)
     
-    # Verificar información del usuario existente
-    user_info = context.get('user_info', {})
-    if user_info and not context.get('form_completed', False):
-        # Si ya tenemos algunos datos pero no todos, favorecer recolección de datos
-        scores['DataCollectionAgent'] += 0.15
-        
-    # Detectar términos de cotización para evitar que los maneje el DataCollectionAgent
-    cotization_terms = ["cotizar", "cotización", "cotizacion", "presupuesto", 
-                         "precio", "costo", "cuánto cuesta", "cuanto vale"]
+    # Solo aumentar DataCollectionAgent si es explícitamente una solicitud de contacto o demo
+    if (is_contact_request or is_demo_request) and 'DataCollectionAgent' in agent_scores:
+        agent_scores['DataCollectionAgent'] += 0.4
     
-    if any(term in normalized_message for term in cotization_terms):
-        # Aumentar puntuación del SalesAgent
-        scores['SalesAgent'] += 0.25
-        # Reducir puntuación del DataCollectionAgent para estos casos
-        scores['DataCollectionAgent'] -= 0.2
-        logger.debug("Términos de cotización detectados, favoreciendo SalesAgent sobre DataCollectionAgent")
+    # 5. Mantener continuidad de conversación con el agente actual
+    if context and 'history' in context and context['history']:
+        last_entry = context['history'][-1] if context['history'] else None
+        if last_entry and 'agent' in last_entry:
+            current_agent = last_entry['agent']
+            
+            # Si el mensaje es corto, favorece continuar con el mismo agente
+            if len(message_normalized.split()) < 5 and current_agent in agent_scores:
+                agent_scores[current_agent] += 0.2
     
-    # Si hay una mención explícita de "call center" o "contact center" junto a términos de precio
-    if ('call center' in normalized_message or 'contact center' in normalized_message) and \
-       any(term in normalized_message for term in cotization_terms):
-        scores['SalesAgent'] += 0.3
-        scores['DataCollectionAgent'] -= 0.15
-        logger.debug("Consulta sobre precios de call center detectada, priorizando SalesAgent")
+    # Registro para depuración
+    logger.debug(f"Agent scores after context adjustment: {agent_scores}")
     
-    return scores
+    return agent_scores
 
 def detect_agent_change_keywords(message: str) -> Optional[str]:
     """
