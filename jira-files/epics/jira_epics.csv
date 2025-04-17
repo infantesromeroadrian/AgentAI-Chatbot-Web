@@ -1,0 +1,9 @@
+Summary,Issue Type,Status,Assignee,Description,Start Date,Due Date
+"AWB-EPIC-001: Configuración y Arquitectura",Epic,Done,Adrian Infantes,"Configuración inicial del proyecto y diseño de arquitectura base",2025-03-15,2025-03-20
+"AWB-EPIC-002: Sistema de Agentes",Epic,Done,Adrian Infantes,"Desarrollo e implementación del sistema de agentes inteligentes",2025-03-19,2025-05-10
+"AWB-EPIC-003: Gestión de Datos",Epic,Done,Adrian Infantes,"Implementación de sistemas de persistencia y gestión de datos",2025-04-05,2025-04-22
+"AWB-EPIC-004: API y Backend",Epic,Done,Adrian Infantes,"Desarrollo de la API REST y backend del sistema",2025-04-20,2025-04-26
+"AWB-EPIC-005: Interfaz de Usuario",Epic,Done,Adrian Infantes,"Implementación de la interfaz web y componentes frontend",2025-04-29,2025-05-10
+"AWB-EPIC-006: Testing y Calidad",Epic,Done,Adrian Infantes,"Pruebas de integración, pruebas de usuarios y corrección de bugs",2025-05-09,2025-05-26
+"AWB-EPIC-007: Infraestructura y Despliegue",Epic,In Progress,Adrian Infantes,"Configuración de infraestructura, despliegue y monitorización",2025-05-14,2025-06-12
+"AWB-EPIC-008: Documentación y Entrega",Epic,In Progress,Adrian Infantes,"Documentación del proyecto, capacitación y entrega final",2025-05-24,2025-06-17 

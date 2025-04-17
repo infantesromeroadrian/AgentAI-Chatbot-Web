@@ -1,0 +1,32 @@
+Summary,Issue Type,Status,Assignee,Start Date,Due Date,Description,Priority
+"AWB-001: Configuración inicial del proyecto",Task,Done,Adrian Infantes,2025-03-15,2025-03-17,"Configurar la estructura básica del proyecto, entorno virtual, dependencias y repositorio Git.",Medium
+"AWB-002: Diseño de la arquitectura base",Task,Done,Adrian Infantes,2025-03-16,2025-03-20,"Diseñar la arquitectura modular del sistema, definiendo los componentes principales.",High
+"AWB-003: Implementación de la clase BaseAgent",Task,Done,Adrian Infantes,2025-03-19,2025-03-22,"Desarrollar la clase base abstracta para todos los agentes del sistema.",High
+"AWB-004: Desarrollo del cliente LM Studio",Task,Done,Adrian Infantes,2025-03-21,2025-03-24,"Implementar el cliente para comunicación con LM Studio para generación de respuestas.",Medium
+"AWB-005: Desarrollo del AgentManager",Task,Done,Adrian Infantes,2025-03-23,2025-03-28,"Implementar el gestor de agentes que coordinará la selección y ejecución de agentes.",High
+"AWB-006: Implementación del GeneralAgent",Task,Done,Adrian Infantes,2025-03-30,2025-04-02,"Desarrollar el agente para manejar consultas generales sobre Alisys.",Medium
+"AWB-007: Implementación del SalesAgent",Task,Done,Adrian Infantes,2025-04-01,2025-04-04,"Desarrollar el agente especializado en información de ventas y precios.",Medium
+"AWB-008: Implementación del EngineerAgent",Task,Done,Adrian Infantes,2025-04-03,2025-04-06,"Desarrollar el agente para aspectos técnicos y estimaciones.",Medium
+"AWB-009: Desarrollo del SentimentAnalyzer",Task,Done,Adrian Infantes,2025-04-05,2025-04-09,"Implementar el analizador de sentimiento para adaptar respuestas.",Medium
+"AWB-010: Desarrollo del IntentClassifier",Task,Done,Adrian Infantes,2025-04-06,2025-04-10,"Implementar el clasificador de intenciones para selección de agentes.",Medium
+"AWB-011: Implementación del DataCollectionAgent",Task,Done,Adrian Infantes,2025-04-08,2025-04-13,"Desarrollar el agente para recopilar datos de contacto de usuarios.",High
+"AWB-012: Desarrollo del ContextPersistenceManager",Task,Done,Adrian Infantes,2025-04-14,2025-04-18,"Implementar el sistema de persistencia de contexto entre sesiones.",Medium
+"AWB-013: Configuración de la base de datos SQLite",Task,Done,Adrian Infantes,2025-04-16,2025-04-19,"Configurar la base de datos y modelos para almacenamiento de leads.",Medium
+"AWB-014: Desarrollo del DataManager",Task,Done,Adrian Infantes,2025-04-18,2025-04-22,"Implementar el gestor para almacenamiento y recuperación de datos.",Medium
+"AWB-015: Implementación de la API REST",Task,Done,Adrian Infantes,2025-04-20,2025-04-25,"Desarrollar las rutas y endpoints de la API del chatbot.",High
+"AWB-016: Implementación de rutas de agentes",Task,Done,Adrian Infantes,2025-04-22,2025-04-26,"Desarrollar las rutas específicas para el sistema de agentes.",Medium
+"AWB-017: Desarrollo de la interfaz web",Task,Done,Adrian Infantes,2025-04-29,2025-05-05,"Implementar la interfaz web responsive para el chatbot.",High
+"AWB-018: Implementación del frontend JavaScript",Task,Done,Adrian Infantes,2025-05-01,2025-05-07,"Desarrollar la lógica JavaScript para la interacción con la API.",Medium
+"AWB-019: Desarrollo de panel de administración",Task,Done,Adrian Infantes,2025-05-05,2025-05-10,"Implementar el panel de administración para gestión de leads.",Medium
+"AWB-020: Implementación del WelcomeAgent",Task,Done,Adrian Infantes,2025-05-07,2025-05-10,"Desarrollar el agente especializado en dar la bienvenida a usuarios.",Low
+"AWB-021: Pruebas de integración",Test,Done,Adrian Infantes,2025-05-09,2025-05-13,"Realizar pruebas de integración de todos los componentes.",High
+"AWB-022: Dockerización de la aplicación",Task,Done,Adrian Infantes,2025-05-14,2025-05-18,"Configurar Docker y docker-compose para el despliegue.",Medium
+"AWB-023: Mejoras de rendimiento",Task,Done,Adrian Infantes,2025-05-16,2025-05-21,"Optimizar el rendimiento del sistema y reducir latencia.",Medium
+"AWB-024: Pruebas de usuarios",Test,Done,Adrian Infantes,2025-05-19,2025-05-24,"Realizar pruebas con usuarios reales para validar la experiencia.",High
+"AWB-025: Corrección de bugs",Bug,Done,Adrian Infantes,2025-05-22,2025-05-26,"Corrección de bugs encontrados durante las pruebas.",High
+"AWB-026: Documentación final",Task,Done,Adrian Infantes,2025-05-24,2025-05-28,"Preparar documentación final del proyecto y guía de usuario.",Medium
+"AWB-027: Despliegue en entorno de producción",Task,In Progress,Adrian Infantes,2025-05-29,2025-06-03,"Desplegar la aplicación en el entorno de producción.",Highest
+"AWB-028: Configuración de monitorización",Task,To Do,Adrian Infantes,2025-06-03,2025-06-07,"Configurar herramientas de monitorización y alertas.",Medium
+"AWB-029: Implementación de analíticas",Task,To Do,Adrian Infantes,2025-06-07,2025-06-12,"Implementar sistema de analíticas para seguimiento de métricas.",Medium
+"AWB-030: Capacitación al equipo de soporte",Task,To Do,Adrian Infantes,2025-06-12,2025-06-15,"Capacitar al equipo de soporte para el mantenimiento del chatbot.",Medium
+"AWB-031: Entrega final al cliente",Task,To Do,Adrian Infantes,2025-06-15,2025-06-17,"Entrega final del proyecto al cliente con documentación completa.",Highest 
