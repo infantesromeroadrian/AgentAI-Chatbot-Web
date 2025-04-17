@@ -59,11 +59,8 @@ def register_routes(app):
             "lm_studio_connected": lm_studio_connected
         })
     
-    @app.route('/chat/stream', methods=['GET'])
-    def chat_stream():
-        """Endpoint para streaming de respuestas del chatbot"""
-        user_message = request.args.get('message', '')
-        
+    def _update_session_state(user_message):
+        """Actualiza el estado de la sesión con el mensaje del usuario"""
         # Guardar el mensaje del usuario en la sesión para uso posterior
         session['last_user_message'] = user_message
         
@@ -79,51 +76,52 @@ def register_routes(app):
         else:
             # Resetear el flag de último mensaje como formulario
             session['last_was_form'] = False
+    
+    def _handle_form_response():
+        """Maneja la respuesta a un campo del formulario"""
+        def simple_response():
+            yield f"data: {json.dumps({'token': 'Procesando tu respuesta...'})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
         
-        # Verificar si es una respuesta a un campo del formulario
-        if session.get('form_active', False):
-            # Simplemente pasar el mensaje al cliente para que lo procese
-            def simple_response():
-                yield f"data: {json.dumps({'token': 'Procesando tu respuesta...'})}\n\n"
-                yield f"data: {json.dumps({'done': True})}\n\n"
-            
-            return Response(
-                stream_with_context(simple_response()), 
-                content_type='text/event-stream'
-            )
+        return Response(
+            stream_with_context(simple_response()), 
+            content_type='text/event-stream'
+        )
+    
+    def _handle_completed_form():
+        """Maneja el caso cuando el formulario ya ha sido completado"""
+        # Verificar si hay datos de contacto guardados
+        leads = get_leads()
         
-        # Verificar si el formulario ya ha sido completado
-        if session.get('form_completed', False):
-            # Verificar si hay datos de contacto guardados
-            leads = get_leads()
-            
-            # Verificar si hay leads y si el último lead tiene los datos mínimos
-            valid_lead_exists = False
-            if leads and len(leads) > 0:
-                last_lead = leads[-1]
-                if hasattr(last_lead, 'name') and hasattr(last_lead, 'email') and last_lead.name and last_lead.email:
-                    valid_lead_exists = True
-            
-            # Si no hay leads válidos, probablemente hubo un error o el formulario no se completó realmente
-            if not valid_lead_exists:
-                # Reiniciar variables de sesión
-                session['form_completed'] = False
-                session['form_shown'] = False
-                session['form_active'] = False
-            else:
-                # Responder con un mensaje de despedida
-                def farewell_response():
-                    response = "Gracias por tu mensaje. Un representante de Alisys ya ha recibido tus datos y se pondrá en contacto contigo en breve. Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**."
-                    yield f"data: {json.dumps({'token': response})}\n\n"
-                    yield f"data: {json.dumps({'done': True})}\n\n"
-                
-                return Response(
-                    stream_with_context(farewell_response()), 
-                    content_type='text/event-stream'
-                )
+        # Verificar si hay leads y si el último lead tiene los datos mínimos
+        valid_lead_exists = False
+        if leads and len(leads) > 0:
+            last_lead = leads[-1]
+            if hasattr(last_lead, 'name') and hasattr(last_lead, 'email') and last_lead.name and last_lead.email:
+                valid_lead_exists = True
         
-        # Crear o actualizar el contexto para los agentes
-        context = {
+        # Si no hay leads válidos, probablemente hubo un error o el formulario no se completó realmente
+        if not valid_lead_exists:
+            # Reiniciar variables de sesión
+            session['form_completed'] = False
+            session['form_shown'] = False
+            session['form_active'] = False
+            return None
+        
+        # Responder con un mensaje de despedida
+        def farewell_response():
+            response = "Gracias por tu mensaje. Un representante de Alisys ya ha recibido tus datos y se pondrá en contacto contigo en breve. Si necesitas asistencia inmediata, puedes llamarnos al **+34 910 200 000**."
+            yield f"data: {json.dumps({'token': response})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        
+        return Response(
+            stream_with_context(farewell_response()), 
+            content_type='text/event-stream'
+        )
+    
+    def _build_agent_context():
+        """Construye el contexto para los agentes a partir de la sesión"""
+        return {
             'message_count': session.get('message_count', 0),
             'form_shown': session.get('form_shown', False),
             'form_active': session.get('form_active', False),
@@ -134,41 +132,62 @@ def register_routes(app):
             'user_info': session.get('user_info', {}),
             'project_info': session.get('project_info', {})
         }
+    
+    def _process_with_agents(user_message, context):
+        """Procesa el mensaje con el gestor de agentes"""
+        try:
+            # Obtener la respuesta del agente adecuado
+            for chunk in agent_manager.process_message(user_message, context):
+                # Formatear la respuesta para SSE
+                yield f"data: {json.dumps({'token': chunk})}\n\n"
+            
+            # Marcar como completado
+            yield f"data: {json.dumps({'done': True})}\n\n"
+            
+            # Actualizar la sesión con el contexto actualizado
+            session['current_agent'] = context.get('current_agent')
+            session['previous_agent'] = context.get('previous_agent')
+            session['user_info'] = context.get('user_info', {})
+            session['project_info'] = context.get('project_info', {})
+            
+            # Actualizar variables de formulario si fueron modificadas por los agentes
+            if 'form_completed' in context:
+                session['form_completed'] = context['form_completed']
+            if 'form_shown' in context:
+                session['form_shown'] = context['form_shown']
+            if 'form_active' in context:
+                session['form_active'] = context['form_active']
+            
+        except Exception as e:
+            print(f"Error al procesar mensaje con agentes: {str(e)}")
+            traceback.print_exc()
+            yield f"data: {json.dumps({'token': 'Lo siento, ha ocurrido un error al procesar tu mensaje. Por favor, inténtalo de nuevo.'})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+    
+    @app.route('/chat/stream', methods=['GET'])
+    def chat_stream():
+        """Endpoint para streaming de respuestas del chatbot"""
+        user_message = request.args.get('message', '')
         
-        # Procesar el mensaje con el gestor de agentes
-        def process_with_agents():
-            try:
-                # Obtener la respuesta del agente adecuado
-                for chunk in agent_manager.process_message(user_message, context):
-                    # Formatear la respuesta para SSE
-                    yield f"data: {json.dumps({'token': chunk})}\n\n"
-                
-                # Marcar como completado
-                yield f"data: {json.dumps({'done': True})}\n\n"
-                
-                # Actualizar la sesión con el contexto actualizado
-                session['current_agent'] = context.get('current_agent')
-                session['previous_agent'] = context.get('previous_agent')
-                session['user_info'] = context.get('user_info', {})
-                session['project_info'] = context.get('project_info', {})
-                
-                # Actualizar variables de formulario si fueron modificadas por los agentes
-                if 'form_completed' in context:
-                    session['form_completed'] = context['form_completed']
-                if 'form_shown' in context:
-                    session['form_shown'] = context['form_shown']
-                if 'form_active' in context:
-                    session['form_active'] = context['form_active']
-                
-            except Exception as e:
-                print(f"Error al procesar mensaje con agentes: {str(e)}")
-                traceback.print_exc()
-                yield f"data: {json.dumps({'token': 'Lo siento, ha ocurrido un error al procesar tu mensaje. Por favor, inténtalo de nuevo.'})}\n\n"
-                yield f"data: {json.dumps({'done': True})}\n\n"
+        # Actualizar el estado de la sesión
+        _update_session_state(user_message)
+        
+        # Verificar si es una respuesta a un campo del formulario
+        if session.get('form_active', False):
+            return _handle_form_response()
+        
+        # Verificar si el formulario ya ha sido completado
+        if session.get('form_completed', False):
+            form_response = _handle_completed_form()
+            if form_response:
+                return form_response
+        
+        # Crear o actualizar el contexto para los agentes
+        context = _build_agent_context()
         
         # Usar el sistema de agentes para procesar el mensaje
         return Response(
-            stream_with_context(process_with_agents()), 
+            stream_with_context(_process_with_agents(user_message, context)), 
             content_type='text/event-stream'
         )
     

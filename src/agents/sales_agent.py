@@ -20,59 +20,48 @@ class SalesAgent(BaseAgent):
             description="Especialista en cotizaciones y precios de servicios"
         )
     
-    def can_handle(self, message: str, context: Dict[str, Any]) -> bool:
+    def _adjust_confidence(self, base_confidence: float, message: str, context: Dict[str, Any]) -> float:
         """
-        Determina si este agente puede manejar el mensaje actual.
+        Ajusta la confianza del agente de ventas basado en criterios específicos.
         
         Args:
+            base_confidence: Confianza base calculada por el clasificador
             message: Mensaje del usuario
             context: Contexto de la conversación
             
         Returns:
-            True si el agente puede manejar el mensaje, False en caso contrario
+            Confianza ajustada
         """
-        # Palabras clave relacionadas con ventas y precios
-        sales_keywords = [
-            "precio", "costo", "cotización", "cotizar", "presupuesto",
-            "cuánto cuesta", "cuanto vale", "tarifa", "pagar", "inversión",
-            "económico", "barato", "caro", "descuento", "oferta", "promoción",
-            "plan", "paquete", "contratar", "adquirir", "comprar",
-            "representante", "comercial", "ventas", "contactar", "contacto",
-            "llamar", "llamada", "asesor", "asesoría", "consultor"
+        # Si el mensaje contiene palabras muy específicas de ventas, aumentar aún más la confianza
+        high_sales_indicators = [
+            "cotización", "cotizar", "presupuesto", "cuánto cuesta", "cuanto vale",
+            "descuento", "oferta", "promoción", "contrato", "presupuestar"
         ]
         
-        # Frases completas que indican interés en ventas
-        sales_phrases = [
-            "me gustaría recibir una cotización",
-            "quiero que me contacten",
-            "necesito hablar con un representante",
-            "me gustaría más información",
-            "pueden contactarme",
-            "me interesa contratar"
-        ]
+        # Verificar palabras clave de alta prioridad
+        for indicator in high_sales_indicators:
+            if indicator in message.lower():
+                base_confidence += 0.15
+                break  # Aplicar solo una vez este bonus
         
-        # Verificar si el mensaje contiene alguna palabra clave de ventas
-        message_lower = message.lower()
-        
-        # Verificar palabras clave
-        for keyword in sales_keywords:
-            if keyword in message_lower:
-                return True
-        
-        # Verificar frases completas
-        for phrase in sales_phrases:
-            if phrase in message_lower:
-                return True
-        
-        # También manejar si el contexto indica que estamos en fase de ventas
-        if context.get('current_agent') == self.name:
-            return True
-        
-        # O si el agente anterior fue el ingeniero y ahora necesitamos cotizar
+        # Si el agente anterior fue el ingeniero, es probable que ahora necesiten cotizar
         if context.get('previous_agent') == "EngineerAgent":
-            return True
+            base_confidence += 0.2
         
-        return False
+        # Si hay información técnica en el contexto pero aún no se ha hablado de precios
+        if context.get('project_info') and not context.get('price_discussed', False):
+            base_confidence += 0.15
+        
+        # Si hemos mostrado precios anteriormente, mantener a este agente como preferido
+        if context.get('current_agent') == self.name:
+            base_confidence += 0.15
+        
+        # Si el usuario pregunta por un plan específico que mencionamos antes
+        plan_keywords = ["plan básico", "plan básico", "plan estándar", "plan premium"]
+        if any(plan in message.lower() for plan in plan_keywords):
+            base_confidence += 0.25
+        
+        return min(base_confidence, 1.0)  # Limitar a 1.0
     
     def get_system_prompt(self, context: Dict[str, Any]) -> str:
         """
@@ -86,6 +75,9 @@ class SalesAgent(BaseAgent):
         """
         # Extraer información relevante del contexto
         project_info = context.get('project_info', {})
+        
+        # Marcar que hemos hablado de precios en el contexto
+        context['price_discussed'] = True
         
         return f"""Eres un experto en ventas de Alisys, una empresa líder en soluciones tecnológicas innovadoras.
 Tu objetivo es proporcionar cotizaciones precisas y persuasivas para los servicios de Alisys.

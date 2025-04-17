@@ -20,22 +20,37 @@ class GeneralAgent(BaseAgent):
             description="Especialista en información general sobre Alisys"
         )
     
-    def can_handle(self, message: str, context: Dict[str, Any]) -> bool:
+    def _adjust_confidence(self, base_confidence: float, message: str, context: Dict[str, Any]) -> float:
         """
-        Determina si este agente puede manejar el mensaje actual.
-        El agente general puede manejar cualquier mensaje que no sea específico
-        para otros agentes más especializados.
+        Ajusta la confianza del agente general.
+        El agente general tiene una confianza base ligeramente más alta y sirve como fallback.
         
         Args:
+            base_confidence: Confianza base calculada por el clasificador
             message: Mensaje del usuario
             context: Contexto de la conversación
             
         Returns:
-            True si el agente puede manejar el mensaje, False en caso contrario
+            Confianza ajustada
         """
-        # El agente general es el agente por defecto, puede manejar cualquier mensaje
-        # que no sea específico para otros agentes
-        return True
+        # El agente general tiene una prioridad base más alta para mensajes cortos
+        if len(message) < 15:
+            base_confidence += 0.1
+        
+        # Si es el primer mensaje de la conversación, mayor confianza
+        if context.get('message_count', 0) <= 1:
+            base_confidence += 0.2
+        
+        # Si no hay un agente específico en el contexto, aumentar confianza
+        if not context.get('current_agent'):
+            base_confidence += 0.1
+        
+        # Si contiene saludos o preguntas muy generales, aumentar confianza
+        greeting_words = ['hola', 'buenos dias', 'buenas tardes', 'saludos', 'hello']
+        if any(greeting in message.lower() for greeting in greeting_words):
+            base_confidence += 0.2
+        
+        return min(base_confidence, 1.0)  # Limitar a 1.0
     
     def get_system_prompt(self, context: Dict[str, Any]) -> str:
         """

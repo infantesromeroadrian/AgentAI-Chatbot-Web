@@ -1,119 +1,191 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║  ARQUITECTURA DEL SISTEMA MULTI-AGENTE PARA ALISYS CHATBOT                 ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                          DESCRIPCIÓN GENERAL
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+El chatbot de Alisys implementa un sistema multi-agente sofisticado que permite manejar diferentes tipos de consultas de usuarios de manera especializada. La arquitectura está diseñada para proporcionar respuestas contextuales y guiar al usuario a través de un proceso de ventas y soporte técnico personalizado.
+
+■ COMPONENTES PRINCIPALES:
+
+1. INTERFAZ DE USUARIO:
+   • Implementada como una aplicación web con Flask
+   • Proporciona un chat interactivo con streaming de respuestas
+   • Muestra indicadores visuales del agente activo
+   • Permite cambiar entre modo estándar y modo de agentes
+
+2. AGENT MANAGER:
+   • Coordina la selección y ejecución de agentes
+   • Mantiene el contexto de la conversación
+   • Gestiona la transición entre diferentes agentes
+   • Implementado en agent_manager.py
+
+3. SELECTOR DE AGENTES:
+   • Analiza el mensaje del usuario para determinar qué agente debe responder
+   • Utiliza reglas y patrones para la selección
+   • Puede cambiar de agente basado en palabras clave o intención del usuario
+
+4. AGENTES ESPECIALIZADOS:
+   • Base Agent / General Agent: Maneja consultas generales y clarifica necesidades
+   • Sales Agent: Proporciona información comercial y de ventas
+   • Engineering Agent: Ofrece detalles técnicos y estimaciones de tiempo
+   • Data Collection Agent: Captura información de contacto del usuario
+
+5. INTEGRACIÓN CON LLM:
+   • Utiliza LM Studio como backend para generación de texto
+   • Cada agente construye prompts específicos para su dominio
+   • Implementa streaming para respuestas más fluidas
+
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                          FLUJO DE TRABAJO
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+1. ENTRADA DEL USUARIO:
+   • El usuario accede a la interfaz web y envía una consulta inicial
+   • La consulta se envía al Agent Manager
+
+2. PROCESAMIENTO INICIAL:
+   • El Agent Manager selecciona inicialmente al General Agent
+   • El General Agent clarifica las necesidades del usuario
+
+3. SELECCIÓN AUTOMÁTICA DE AGENTES:
+   • Basado en la respuesta del usuario, el Selector de Agentes activa agentes especializados
+   • La selección se basa en palabras clave y contexto de la conversación
+
+4. INTERACCIÓN CON AGENTES ESPECIALIZADOS:
+   • Sales Agent: Proporciona propuestas comerciales y ventajas competitivas
+   • Engineering Agent: Explica aspectos técnicos y proporciona estimaciones de tiempo
+   • Data Collection Agent: Se activa cuando el usuario muestra interés para capturar sus datos de contacto
+
+5. FINALIZACIÓN DEL PROCESO:
+   • Después de capturar la información necesaria, se muestra un mensaje de confirmación
+   • Se informa al usuario que un equipo está trabajando en su proyecto
+   • Se proporciona un estimado inicial de tiempo
+
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                          IMPLEMENTACIÓN TÉCNICA
+▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+1. BASE DE AGENTES:
+   • Todos los agentes heredan de BaseAgent (agents/base_agent.py)
+   • Cada agente implementa métodos específicos para su dominio
+
+2. SELECCIÓN DE AGENTES:
+   • El método select_agent en AgentManager evalúa cada agente
+   • Cada agente implementa un método can_handle que determina si puede manejar un mensaje
+   • Se selecciona el agente con mayor puntuación de confianza
+
+3. GESTIÓN DE CONTEXTO:
+   • El AgentManager mantiene un diccionario de contexto
+   • El contexto incluye historial de conversación, información del usuario y agente actual
+
+4. INTEGRACIÓN CON LLM:
+   • Cada agente construye un prompt específico
+   • El servicio lm_studio.py maneja la comunicación con el modelo de lenguaje
+   • Se implementa streaming para respuestas más naturales
+
+5. CAPTURA DE DATOS:
+   • El DataCollectionAgent maneja un flujo especial para capturar información
+   • Los datos se almacenan en la base de datos a través de data_manager.py
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                      DIAGRAMAS DE LA ARQUITECTURA                          ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+■ DIAGRAMA DE ARQUITECTURA GENERAL:
+
 ┌─────────────────────────────────────────┐
 │          INTERFAZ DE USUARIO            │
+│  (HTML/CSS/JavaScript + Flask Templates) │
 └───────────────────┬─────────────────────┘
                     │
                     ▼
 ┌─────────────────────────────────────────┐
 │             AGENT MANAGER               │
+│         (agents/agent_manager.py)       │
 └───────────────────┬─────────────────────┘
                     │
                     ▼
 ┌─────────────────────────────────────────┐
 │          SELECTOR DE AGENTES            │
-└─────┬─────────────┬────────────────┬────┘
-      │             │                │
-      ▼             ▼                ▼
-┌──────────┐   ┌──────────┐    ┌──────────┐
-│  AGENT 1  │  │  AGENT 2 │    │  AGENT n  │
-└────┬─────┘   └────┬─────┘    └────┬─────┘
-     │              │               │
-     └──────────────┼───────────────┘
-                    │
-                    ▼
+│    (Parte de agent_manager.select_agent) │
+└─────┬─────────────┬────────────┬────────┘
+      │             │            │
+      ▼             ▼            ▼
+┌──────────┐   ┌──────────┐  ┌──────────┐
+│ GENERAL  │   │  SALES   │  │ENGINEERING│
+│  AGENT   │   │  AGENT   │  │  AGENT    │
+└────┬─────┘   └────┬─────┘  └────┬─────┘
+     │              │             │
+     │              │             │
+     ▼              ▼             ▼
+┌──────────────────────────────────────┐
+│         DATA COLLECTION AGENT        │
+│     (Activado cuando hay interés)    │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
 ┌─────────────────────────────────────────┐
 │                  LLM                    │
+│        (services/lm_studio.py)          │
 └─────────────────────────────────────────┘
 
-╔════════════════════════════════════════════════════════════════════════════╗
-║  ESQUEMA COMPLETO Y PROCESO DEL SISTEMA MULTI-AGENTE PARA ALISYS           ║
-╚════════════════════════════════════════════════════════════════════════════╝
+■ DIAGRAMA DE FLUJO DE CONVERSACIÓN:
 
-▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-                          FLUJO GENERAL DEL USUARIO
-▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   USUARIO   │────►│  INTERFAZ   │────►│    AGENT    │
+│             │◄────│    WEB      │◄────│   MANAGER   │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                                               ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   AGENTE    │◄────│  SELECTOR   │◄────│  ANÁLISIS   │
+│ SELECCIONADO│     │  DE AGENTES │     │  DE MENSAJE │
+└──────┬──────┘     └─────────────┘     └─────────────┘
+       │
+       ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│ CONSTRUCCIÓN│────►│    LLM      │────►│  RESPUESTA  │
+│  DE PROMPT  │     │  (LM STUDIO)│     │  GENERADA   │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                                               ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   USUARIO   │◄────│  INTERFAZ   │◄────│  STREAMING  │
+│   RECIBE    │     │    WEB      │     │ DE RESPUESTA│
+└─────────────┘     └─────────────┘     └─────────────┘
 
-■ ENTRADA DE USUARIO:
-  • El usuario entra en la página web de Alisys.
-  • Introduce una consulta inicial o necesidad sobre un servicio (Ejemplo: sistema de videovigilancia).
+■ DIAGRAMA DE TRANSICIÓN ENTRE AGENTES:
 
-■ AGENT MANAGER:
-  • Recibe la consulta del usuario.
-  • Selecciona al Base Agent para interactuar inicialmente.
-
-■ BASE AGENT:
-  • Responsabilidad: Clarificar necesidades específicas del usuario.
-  • Construcción del Prompt:
-    "Eres un asistente de Alisys. El usuario dice: '[consulta del usuario]'. 
-     Haz preguntas para entender mejor sus necesidades específicas."
-  • LLM: Genera preguntas de aclaración.
-  • Interacción con Usuario: Base Agent envía estas preguntas al usuario para obtener detalles adicionales.
-
-■ SELECCIÓN AUTOMÁTICA DE AGENTES ESPECÍFICOS:
-  • Selector de Agentes:
-    - El Agent Manager analiza la respuesta del usuario.
-    - En función del contexto, activa agentes específicos como Sales Agent e Engineering Agent.
-
-■ SALES AGENT:
-  • Responsabilidad: Convencer al usuario de elegir los servicios de Alisys.
-  • Construcción del Prompt:
-    "Eres un experto en ventas de Alisys. El usuario tiene [detalles obtenidos]. 
-     Proporciona recomendaciones técnicas específicas, ventajas comerciales y una propuesta preliminar."
-  • LLM: Genera una propuesta de ventas atractiva, destacando ventajas competitivas y beneficios del servicio.
-  • Interacción con Usuario: Sales Agent envía esta información para persuadir al usuario.
-
-■ ENGINEERING AGENT:
-  • Responsabilidad: Explicar técnicamente cómo se abordará el proyecto, dar estimados iniciales.
-  • Construcción del Prompt:
-    "Eres un ingeniero de Alisys. El usuario necesita [detalles técnicos del servicio requerido]. 
-     Proporciona una descripción técnica inicial sobre cómo se implementará el servicio y un estimado 
-     de horas para su implementación."
-  • LLM: Genera una explicación técnica clara y estimado de horas.
-  • Interacción con Usuario: Engineering Agent envía esta información técnica al usuario.
-
-■ FINALIZACIÓN DEL PROCESO CON PUSH UP:
-  • Push Up final:
-    - Después de que el usuario recibe las explicaciones técnica y comercial, aparece una ventana 
-      emergente o notificación.
-    - Esta ventana indica que un equipo de ingenieros de Alisys (nombrando algunos profesionales 
-      específicos) ya está trabajando en el análisis preliminar del proyecto.
-    - Se incluye claramente el estimado de horas inicial proporcionado por Engineering Agent y un mensaje como:
-      "Nuestro equipo ya está trabajando en tu proyecto. Tiempo estimado inicial: X horas. 
-       ¡Estamos comprometidos contigo!"
-
-╔════════════════════════════════════════════════════════════════════════════╗
-║                      DIAGRAMA COMPLETO DEL FLUJO                           ║
-╚════════════════════════════════════════════════════════════════════════════╝
-
-┌─────────────────────┐
-│  INTERFAZ USUARIO   │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│   AGENT MANAGER     │
-└──────────┬──────────┘
-           │
-           ▼                                ┌─────────────────┐
-┌─────────────────────┐                     │                 │
-│ SELECTOR DE AGENTES ├────────────────────►│   BASE AGENT    ├───►CLARIFICACIÓN
-└──────────┬──────────┘                     │                 │
-           │                                └─────────────────┘
-           │
-           ▼                                ┌─────────────────┐
-┌─────────────────────┐                     │                 │
-│    SALES AGENT      ├────────────────────►│PROPUESTA        ├───►COMERCIAL
-└──────────┬──────────┘                     │                 │
-           │                                └─────────────────┘
-           ▼                                ┌─────────────────┐
-┌─────────────────────┐                     │EXPLICACIÓN      │
-│  ENGINEERING AGENT  ├────────────────────►│TÉCNICA Y        ├───►ESTIMADO
-└──────────┬──────────┘                     │                 │
-           │                                └─────────────────┘
-           ▼                                ┌─────────────────┐
-┌─────────────────────┐                     │CONFIRMACIÓN     │
-│   PUSH UP FINAL     ├────────────────────►│TRABAJO EQUIPO   ├───►Y ESTIMADO
-└─────────────────────┘                     │                 │
-                                            └─────────────────┘
+                    ┌───────────────────┐
+                    │   INICIO CHAT     │
+                    └─────────┬─────────┘
+                              │
+                              ▼
+┌───────────────────────────────────────────────────┐
+│                  GENERAL AGENT                    │
+│  - Saluda al usuario                              │
+│  - Proporciona información general                │
+│  - Clarifica necesidades                          │
+└───┬───────────────────────────────────┬───────────┘
+    │                                   │
+    ▼                                   ▼
+┌─────────────────────┐       ┌─────────────────────┐
+│    SALES AGENT      │       │  ENGINEERING AGENT  │
+│ - Información de    │       │ - Detalles técnicos │
+│   productos/servicios│◄─────►│ - Estimaciones     │
+│ - Precios/planes    │       │ - Implementación    │
+└─────────┬───────────┘       └─────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────┐
+│       DATA COLLECTION AGENT         │
+│ - Captura información de contacto   │
+│ - Formulario interactivo            │
+│ - Almacena datos en la base de datos│
+└─────────────────────────────────────┘
 
 
 
