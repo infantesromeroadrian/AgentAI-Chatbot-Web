@@ -29,4 +29,5 @@ Summary,Issue Type,Status,Assignee,Start Date,Due Date,Description,Priority
 "AWB-028: Configuración de monitorización",Task,To Do,Adrian Infantes,2025-06-03,2025-06-07,"Configurar herramientas de monitorización y alertas.",Medium
 "AWB-029: Implementación de analíticas",Task,To Do,Adrian Infantes,2025-06-07,2025-06-12,"Implementar sistema de analíticas para seguimiento de métricas.",Medium
 "AWB-030: Capacitación al equipo de soporte",Task,To Do,Adrian Infantes,2025-06-12,2025-06-15,"Capacitar al equipo de soporte para el mantenimiento del chatbot.",Medium
-"AWB-031: Entrega final al cliente",Task,To Do,Adrian Infantes,2025-06-15,2025-06-17,"Entrega final del proyecto al cliente con documentación completa.",Highest 
+"AWB-031: Entrega final al cliente",Task,To Do,Adrian Infantes,2025-06-15,2025-06-17,"Entrega final del proyecto al cliente con documentación completa.",Highest
+"AWB-TASK-023: Mejoras UI Header",Task,Done,Adrian Infantes,2025-05-14,2025-05-15,"Optimización de la interfaz de usuario: eliminación del panel de accesibilidad innecesario, mejora de la visualización del indicador de agente y reorganización del header para evitar superposiciones entre elementos.",Medium 

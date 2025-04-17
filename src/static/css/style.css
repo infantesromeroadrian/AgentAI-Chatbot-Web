@@ -16,7 +16,7 @@
 }
 
 /* Tema oscuro */
-body.high-contrast {
+/* body.high-contrast {
     --primary-color: #3498db;
     --secondary-color: #2ecc71;
     --bg-color: #121212;
@@ -27,7 +27,7 @@ body.high-contrast {
     --placeholder-color: #aaa;
     --border-color: #444;
     --shadow-color: rgba(0,0,0,0.2);
-}
+} */
 
 /* Aplicar colores a elementos */
 body {
@@ -39,7 +39,7 @@ body {
 }
 
 /* Texto más grande para accesibilidad */
-body.larger-text {
+/* body.larger-text {
     font-size: 18px;
 }
 
@@ -56,10 +56,10 @@ body.larger-text #user-input {
 }
 
 /* Reducción de animaciones */
-body.reduce-motion * {
+/* body.reduce-motion * {
     animation-duration: 0.001s !important;
     transition-duration: 0.001s !important;
-}
+} */
 
 * {
     margin: 0;
@@ -910,4 +910,108 @@ body.reduce-motion * {
     .form-submit-button {
         padding: 8px 12px;
     }
+}
+
+/* Enhanced styles for agent display */
+.agent-selection-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+.agent-selection-button {
+    display: flex;
+    align-items: center;
+    padding: 8px 15px;
+    border-radius: 20px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.agent-selection-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.agent-selection-button i {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+/* Color schemes for different agents */
+.agent-selection-button.general {
+    color: #546E7A;
+    border-color: #607D8B;
+}
+
+.agent-selection-button.general:hover {
+    background-color: #607D8B;
+    color: white;
+}
+
+.agent-selection-button.sales {
+    color: #1976D2;
+    border-color: #2196F3;
+}
+
+.agent-selection-button.sales:hover {
+    background-color: #2196F3;
+    color: white;
+}
+
+.agent-selection-button.engineer {
+    color: #E65100;
+    border-color: #FF9800;
+}
+
+.agent-selection-button.engineer:hover {
+    background-color: #FF9800;
+    color: white;
+}
+
+.agent-selection-button.data-collection {
+    color: #7B1FA2;
+    border-color: #9C27B0;
+}
+
+.agent-selection-button.data-collection:hover {
+    background-color: #9C27B0;
+    color: white;
+}
+
+/* Styling for the agent badge that appears in messages */
+.agent-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Enhanced appearance for bot avatars in messages */
+.bot-avatar {
+    position: relative;
+    overflow: visible !important;
+}
+
+.bot-avatar::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background-color: inherit;
+    border-radius: 50%;
+    bottom: -3px;
+    right: -3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 } 

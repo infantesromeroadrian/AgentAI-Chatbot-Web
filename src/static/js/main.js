@@ -182,13 +182,13 @@ function updateCurrentAgentIndicator(agentId) {
         };
         
         nameElement.textContent = agentInfo.name;
-        indicator.style.backgroundColor = agentInfo.color + '20';  // Color con transparencia
-        indicator.style.borderColor = agentInfo.color;
+        indicator.style.backgroundColor = agentInfo.color;
+        indicator.style.color = '#FFFFFF';
         
         // Actualizar icono
         const iconElement = indicator.querySelector('.agent-icon');
         if (iconElement) {
-            iconElement.className = `${agentInfo.icon} agent-icon`;
+            iconElement.className = `agent-icon ${agentInfo.icon}`;
         }
         
         // Guardar agente actual para futuros usos
@@ -196,6 +196,12 @@ function updateCurrentAgentIndicator(agentId) {
         
         // Actualizar sugerencias basadas en el agente actual
         updateSuggestionChips(agentId);
+        
+        // Añadir animación
+        indicator.classList.add('agent-change-animation');
+        setTimeout(() => {
+            indicator.classList.remove('agent-change-animation');
+        }, 1000);
     }
 }
 
@@ -358,9 +364,31 @@ function sendMessage(customMessage = null, hidden = false) {
     
     const avatar = document.createElement('div');
     avatar.className = 'avatar bot-avatar';
-    avatar.innerHTML = '<i class="fas fa-robot"></i>';
+    
+    // Usar el icono según el agente actual
+    const agentInfo = agentsInfo[currentAgent] || { 
+        icon: 'fas fa-robot',
+        color: '#607D8B'
+    };
+    
+    // Aplicar el estilo del icono según el agente
+    avatar.innerHTML = `<i class="${agentInfo.icon}"></i>`;
+    avatar.style.backgroundColor = agentInfo.color;
+    avatar.style.color = '#FFFFFF';
     
     messageHeader.appendChild(avatar);
+    
+    // Añadir etiqueta con el nombre del agente si estamos en modo agentes
+    if (useAgents && agentInfo.name) {
+        const agentBadge = document.createElement('span');
+        agentBadge.className = 'agent-badge';
+        agentBadge.textContent = agentInfo.name;
+        agentBadge.style.backgroundColor = agentInfo.color + '20';
+        agentBadge.style.color = agentInfo.color;
+        agentBadge.style.border = `1px solid ${agentInfo.color}`;
+        messageHeader.appendChild(agentBadge);
+    }
+    
     currentResponseElement.appendChild(messageHeader);
     
     const messageContent = document.createElement('div');
@@ -607,7 +635,7 @@ function addUserMessage(text) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-function addBotMessage(text) {
+function addBotMessage(text, agent = null) {
     const chatContainer = document.getElementById('chat-container');
     const messageElement = document.createElement('div');
     messageElement.className = 'message bot-message';
@@ -617,9 +645,32 @@ function addBotMessage(text) {
     
     const avatar = document.createElement('div');
     avatar.className = 'avatar bot-avatar';
-    avatar.innerHTML = '<i class="fas fa-robot"></i>';
+    
+    // Usar el icono según el agente actual
+    const agentToUse = agent || currentAgent;
+    const agentInfo = agentsInfo[agentToUse] || { 
+        icon: 'fas fa-robot',
+        color: '#607D8B'
+    };
+    
+    // Aplicar el estilo del icono según el agente
+    avatar.innerHTML = `<i class="${agentInfo.icon}"></i>`;
+    avatar.style.backgroundColor = agentInfo.color;
+    avatar.style.color = '#FFFFFF';
     
     messageHeader.appendChild(avatar);
+    
+    // Añadir etiqueta con el nombre del agente
+    if (useAgents && agentInfo.name) {
+        const agentBadge = document.createElement('span');
+        agentBadge.className = 'agent-badge';
+        agentBadge.textContent = agentInfo.name;
+        agentBadge.style.backgroundColor = agentInfo.color + '20';
+        agentBadge.style.color = agentInfo.color;
+        agentBadge.style.border = `1px solid ${agentInfo.color}`;
+        messageHeader.appendChild(agentBadge);
+    }
+    
     messageElement.appendChild(messageHeader);
     
     const messageContent = document.createElement('div');
@@ -674,11 +725,31 @@ function sendChatRequest(message) {
     const messageHeader = document.createElement('div');
     messageHeader.className = 'message-header';
     
+    // Usar el icono según el agente actual
+    const agentInfo = agentsInfo[currentAgent] || { 
+        icon: 'fas fa-robot',
+        color: '#607D8B'
+    };
+    
     const avatar = document.createElement('div');
     avatar.className = 'avatar bot-avatar';
-    avatar.innerHTML = '<i class="fas fa-robot"></i>';
+    avatar.innerHTML = `<i class="${agentInfo.icon}"></i>`;
+    avatar.style.backgroundColor = agentInfo.color;
+    avatar.style.color = '#FFFFFF';
     
     messageHeader.appendChild(avatar);
+    
+    // Añadir etiqueta con el nombre del agente si estamos en modo agentes
+    if (useAgents && agentInfo.name) {
+        const agentBadge = document.createElement('span');
+        agentBadge.className = 'agent-badge';
+        agentBadge.textContent = agentInfo.name;
+        agentBadge.style.backgroundColor = agentInfo.color + '20';
+        agentBadge.style.color = agentInfo.color;
+        agentBadge.style.border = `1px solid ${agentInfo.color}`;
+        messageHeader.appendChild(agentBadge);
+    }
+    
     currentResponseElement.appendChild(messageHeader);
     
     const messageContent = document.createElement('div');

@@ -274,6 +274,18 @@
 - 16/05: Configuración de docker-compose
 - 18/05: Pruebas de despliegue local
 
+### AWB-TASK-023: Mejoras UI Header
+**Tipo**: Tarea
+**Estado**: Completado
+**Asignado a**: Adrian Infantes
+**Fecha inicio**: 14/05/2025
+**Fecha fin**: 15/05/2025
+**Descripción**: Optimización de la interfaz de usuario: eliminación del panel de accesibilidad innecesario, mejora de la visualización del indicador de agente y reorganización del header para evitar superposiciones entre elementos.
+**Comentarios**:
+- 14/05: Análisis del diseño actual y planificación de mejoras
+- 14/05: Implementación de cambios en la estructura del header
+- 15/05: Pruebas de visualización en diferentes dispositivos y finalización
+
 ### AWB-023: Mejoras de rendimiento
 **Tipo**: Tarea
 **Estado**: Completado

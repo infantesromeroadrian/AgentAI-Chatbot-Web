@@ -35,6 +35,7 @@ gantt
     
     section Sprint 5
     Dockerización de la aplicación (AWB-022) :e1, 2025-05-14, 5d
+    Mejoras UI Header (AWB-TASK-023)     :e6, 2025-05-14, 2d
     Mejoras de rendimiento (AWB-023)     :e2, 2025-05-16, 6d
     Pruebas de usuarios (AWB-024)        :e3, 2025-05-19, 6d
     Corrección de bugs (AWB-025)         :e4, 2025-05-22, 5d
@@ -46,4 +47,4 @@ gantt
     Implementación analíticas (AWB-029)  :f3, after f2, 5d
     Capacitación equipo soporte (AWB-030) :f4, after f3, 3d
     Entrega final al cliente (AWB-031)   :f5, after f4, 2d
-``` 
+```

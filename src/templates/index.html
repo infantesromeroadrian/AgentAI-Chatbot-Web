@@ -7,49 +7,106 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        .mode-switch {
-            position: absolute;
-            top: 10px;
-            right: 10px;
+        /* Nueva barra de navegación más espaciada */
+        .header {
+            position: relative;
+            padding: 20px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between; /* Cambiado a space-between para separar el logo y la navegación */
+            height: 70px;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo-container h1 {
+            margin-left: 15px;
+            font-size: 24px;
+        }
+        
+        .navigation-container {
+            display: flex;
+            align-items: center;
+            position: relative;
+            gap: 20px; /* Espacio entre el indicador de agente y el selector de modo */
+        }
+        
+        .mode-switch {
+            display: flex;
+            align-items: center;
+            gap: 15px;
             font-size: 14px;
             color: var(--text-color);
         }
         
         .mode-switch a {
-            padding: 5px 10px;
-            border-radius: 4px;
+            padding: 8px 15px;
+            border-radius: 6px;
             text-decoration: none;
             color: var(--text-color);
             background-color: var(--bg-color-secondary);
             transition: all 0.3s ease;
+            margin: 0 5px;
+            font-weight: 500; /* Make text more visible */
         }
         
         .mode-switch a:hover {
             background-color: var(--primary-color);
             color: white;
+            transform: translateY(-2px); /* Slight lift effect on hover */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Add shadow on hover */
         }
         
         .mode-switch a.active {
             background-color: var(--secondary-color);
             color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Always show shadow for active button */
         }
         
-        /* Nuevos estilos para mejoras de accesibilidad */
-        .accessibility-panel {
-            position: absolute;
-            top: 10px;
-            left: 10px;
+        /* Estilos mejorados para agentes */
+        .avatar.bot-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            margin-right: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
         }
         
-        .accessibility-button {
-            width: 36px;
-            height: 36px;
+        .avatar.bot-avatar i {
+            font-size: 20px;
+        }
+        
+        .agent-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .message-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        /* Nuevo estilo para el botón de información */
+        #agent-info-button {
+            width: 40px; /* Slightly larger */
+            height: 40px; /* Slightly larger */
             border-radius: 50%;
             background-color: var(--bg-color-secondary);
             border: none;
@@ -57,44 +114,41 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            margin-left: 10px;
             transition: all 0.3s ease;
-            color: var(--text-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Add shadow */
         }
         
-        .accessibility-button:hover {
+        #agent-info-button i {
+            font-size: 18px; /* Larger icon */
+            color: var(--primary-color); /* Branded color */
+        }
+        
+        #agent-info-button:hover {
             background-color: var(--primary-color);
+            transform: scale(1.1); /* Grow slightly on hover */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); /* Deeper shadow on hover */
+        }
+        
+        #agent-info-button:hover i {
             color: white;
         }
         
-        .accessibility-menu {
-            display: none;
-            position: absolute;
-            top: 46px;
-            left: 0;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            padding: 12px;
-            min-width: 220px;
-            z-index: 1000;
+        /* Colores específicos para los agentes */
+        .agent-GeneralAgent .bot-avatar {
+            background-color: #607D8B;
         }
         
-        .accessibility-menu h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 16px;
-            color: var(--primary-color);
+        .agent-SalesAgent .bot-avatar {
+            background-color: #2196F3;
         }
         
-        .accessibility-option {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
+        .agent-EngineerAgent .bot-avatar {
+            background-color: #FF9800;
         }
         
-        .accessibility-option label {
-            margin-left: 8px;
-            font-size: 14px;
+        .agent-DataCollectionAgent .bot-avatar {
+            background-color: #9C27B0;
         }
         
         /* Estilos para chat sugerencias */
@@ -127,69 +181,125 @@
         
         /* Mejora para indicador de agente activo */
         .current-agent-indicator {
-            position: absolute;
-            top: 10px;
-            right: 180px;
             display: flex;
             align-items: center;
-            padding: 5px 10px;
-            border-radius: 20px;
+            padding: 10px 18px;
+            border-radius: 25px;
             font-size: 14px;
-            background-color: var(--light-color);
+            font-weight: 700;
+            color: white;
+            background-color: var(--secondary-color);
             transition: all 0.3s ease;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            min-width: 120px;
+            z-index: 5;
+            border: 2px solid white;
+            position: relative; /* Cambiado de absolute a relative */
+        }
+        
+        .agent-icon-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            margin-right: 10px;
         }
         
         .current-agent-indicator .agent-icon {
-            margin-right: 5px;
-            font-size: 16px;
+            font-size: 22px; /* Increased from 20px for better visibility */
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); /* Add shadow to the icon */
+        }
+        
+        /* Animación para cambio de agente */
+        .agent-change-animation {
+            animation: agent-pulse 1.2s ease;
+        }
+        
+        @keyframes agent-pulse {
+            0% { transform: scale(1); }
+            10% { transform: scale(1.08); }
+            20% { transform: scale(1); }
+            30% { transform: scale(1.05); }
+            40% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            60% { transform: scale(1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Nueva animación para el icono cuando cambia */
+        .agent-icon.agent-change-animation {
+            animation: icon-spin 1s ease;
+        }
+        
+        @keyframes icon-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Ajustes para hacer la interfaz más responsive */
+        @media (max-width: 768px) {
+            .header {
+                height: auto;
+                flex-direction: column;
+                align-items: flex-start;
+                padding-bottom: 30px;
+            }
+            
+            .navigation-container {
+                flex-direction: column;
+                align-items: flex-start;
+                margin-top: 20px;
+                width: 100%;
+                gap: 15px;
+            }
+            
+            .mode-switch {
+                width: 100%;
+            }
+            
+            .current-agent-indicator {
+                position: relative;
+                top: auto;
+                left: auto;
+                right: auto;
+                bottom: auto;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <i class="fas fa-robot" style="font-size: 28px; color: var(--secondary-color);"></i>
-            <h1>Alisys ChatBot</h1>
-            
-            <!-- Panel de accesibilidad -->
-            <div class="accessibility-panel">
-                <button id="accessibility-toggle" class="accessibility-button" title="Opciones de accesibilidad">
-                    <i class="fas fa-universal-access"></i>
-                </button>
-                <div id="accessibility-menu" class="accessibility-menu">
-                    <h3>Opciones de accesibilidad</h3>
-                    <div class="accessibility-option">
-                        <input type="checkbox" id="high-contrast" name="high-contrast">
-                        <label for="high-contrast">Alto contraste</label>
-                    </div>
-                    <div class="accessibility-option">
-                        <input type="checkbox" id="larger-text" name="larger-text">
-                        <label for="larger-text">Texto más grande</label>
-                    </div>
-                    <div class="accessibility-option">
-                        <input type="checkbox" id="reduce-motion" name="reduce-motion">
-                        <label for="reduce-motion">Reducir movimiento</label>
-                    </div>
-                </div>
+            <div class="logo-container">
+                <i class="fas fa-robot" style="font-size: 28px; color: var(--secondary-color);"></i>
+                <h1>Alisys ChatBot</h1>
             </div>
             
-            <!-- Indicador de agente actual -->
-            {% if use_agents %}
-            <div id="current-agent-indicator" class="current-agent-indicator">
-                <i class="fas fa-user-circle agent-icon"></i>
-                <span id="current-agent-name">General</span>
-            </div>
-            {% endif %}
-            
-            <div class="mode-switch">
-                <span>Modo:</span>
-                <a href="/" class="{{ 'active' if not use_agents else '' }}">Estándar</a>
-                <a href="/agents" class="{{ 'active' if use_agents else '' }}">Agentes</a>
+            <!-- Menú de navegación reorganizado -->
+            <div class="navigation-container">
+                <!-- Indicador de agente actual -->
                 {% if use_agents %}
-                <button id="agent-info-button" title="Información sobre los agentes">
-                    <i class="fas fa-info-circle"></i>
-                </button>
+                <div id="current-agent-indicator" class="current-agent-indicator" data-agent="GeneralAgent">
+                    <div class="agent-icon-container">
+                        <i class="fas fa-info-circle agent-icon"></i>
+                    </div>
+                    <span id="current-agent-name">General</span>
+                </div>
                 {% endif %}
+                
+                <div class="mode-switch">
+                    <span>Modo:</span>
+                    <a href="/" class="{{ 'active' if not use_agents else '' }}">Estándar</a>
+                    <a href="/agents" class="{{ 'active' if use_agents else '' }}">Agentes</a>
+                    {% if use_agents %}
+                    <button id="agent-info-button" title="Información sobre los agentes">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                    {% endif %}
+                </div>
             </div>
         </div>
         
@@ -258,75 +368,70 @@
             }
         };
         
-        // Configurar menú de accesibilidad
-        document.addEventListener('DOMContentLoaded', function() {
-            const accessibilityToggle = document.getElementById('accessibility-toggle');
-            const accessibilityMenu = document.getElementById('accessibility-menu');
+        // Función para actualizar el indicador de agente
+        function updateAgentIndicator(agentName) {
+            const indicator = document.getElementById('current-agent-indicator');
+            const nameElement = document.getElementById('current-agent-name');
+            const iconElement = indicator.querySelector('.agent-icon');
             
-            if (accessibilityToggle && accessibilityMenu) {
-                accessibilityToggle.addEventListener('click', function() {
-                    if (accessibilityMenu.style.display === 'block') {
-                        accessibilityMenu.style.display = 'none';
-                    } else {
-                        accessibilityMenu.style.display = 'block';
-                    }
-                });
+            if (!indicator || !nameElement) return;
+            
+            const agentInfo = agentsInfo[agentName] || agentsInfo["GeneralAgent"];
+            
+            // Actualizar nombre
+            nameElement.textContent = agentInfo.name;
+            
+            // Actualizar icono y color
+            iconElement.className = ''; // Limpiar clases existentes
+            iconElement.classList.add('agent-icon', agentInfo.icon);
+            
+            // Establecer el atributo data-agent para CSS específico
+            indicator.setAttribute('data-agent', agentName);
+            
+            // Actualizar color de fondo
+            indicator.style.backgroundColor = agentInfo.color;
+            indicator.style.color = '#FFFFFF';
+            
+            // Añadir efecto de brillo al borde
+            indicator.style.boxShadow = `0 4px 12px ${agentInfo.color}70, 0 0 0 2px white`;
+            
+            // Efecto de transición
+            indicator.classList.add('agent-change-animation');
+            iconElement.classList.add('agent-change-animation');
+            
+            // Eliminar clases de animación después de completarse
+            setTimeout(() => {
+                indicator.classList.remove('agent-change-animation');
+                iconElement.classList.remove('agent-change-animation');
+            }, 1200);
+        }
+        
+        // Configurar el modal de información de agentes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Si estamos en modo agentes, configurar el botón de información
+            if (useAgents) {
+                const infoButton = document.getElementById('agent-info-button');
+                const infoModal = document.getElementById('agent-info-modal');
+                const closeButton = document.getElementById('agent-info-close');
                 
-                // Cerrar al hacer clic fuera
-                document.addEventListener('click', function(event) {
-                    if (!accessibilityToggle.contains(event.target) && !accessibilityMenu.contains(event.target)) {
-                        accessibilityMenu.style.display = 'none';
-                    }
-                });
-                
-                // Aplicar configuraciones
-                const highContrast = document.getElementById('high-contrast');
-                const largerText = document.getElementById('larger-text');
-                const reduceMotion = document.getElementById('reduce-motion');
-                
-                // Cargar configuraciones guardadas
-                if (localStorage.getItem('high-contrast') === 'true') {
-                    highContrast.checked = true;
-                    document.body.classList.add('high-contrast');
+                if (infoButton && infoModal && closeButton) {
+                    // Mostrar el modal al hacer clic en el botón de información
+                    infoButton.addEventListener('click', function() {
+                        infoModal.style.display = 'flex';
+                    });
+                    
+                    // Cerrar el modal al hacer clic en el botón de cierre
+                    closeButton.addEventListener('click', function() {
+                        infoModal.style.display = 'none';
+                    });
+                    
+                    // Cerrar el modal al hacer clic fuera del contenido
+                    infoModal.addEventListener('click', function(event) {
+                        if (event.target === infoModal) {
+                            infoModal.style.display = 'none';
+                        }
+                    });
                 }
-                
-                if (localStorage.getItem('larger-text') === 'true') {
-                    largerText.checked = true;
-                    document.body.classList.add('larger-text');
-                }
-                
-                if (localStorage.getItem('reduce-motion') === 'true') {
-                    reduceMotion.checked = true;
-                    document.body.classList.add('reduce-motion');
-                }
-                
-                // Guardar cambios
-                highContrast.addEventListener('change', function() {
-                    localStorage.setItem('high-contrast', this.checked);
-                    if (this.checked) {
-                        document.body.classList.add('high-contrast');
-                    } else {
-                        document.body.classList.remove('high-contrast');
-                    }
-                });
-                
-                largerText.addEventListener('change', function() {
-                    localStorage.setItem('larger-text', this.checked);
-                    if (this.checked) {
-                        document.body.classList.add('larger-text');
-                    } else {
-                        document.body.classList.remove('larger-text');
-                    }
-                });
-                
-                reduceMotion.addEventListener('change', function() {
-                    localStorage.setItem('reduce-motion', this.checked);
-                    if (this.checked) {
-                        document.body.classList.add('reduce-motion');
-                    } else {
-                        document.body.classList.remove('reduce-motion');
-                    }
-                });
             }
         });
     </script>
