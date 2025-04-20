@@ -19,7 +19,13 @@ INTENT_KEYWORDS = {
         'cloud', 'implementación', 'implementacion', 'arquitectura', 'tecnología', 'tecnologia',
         'plataforma', 'software', 'aplicación', 'aplicacion', 'sistema', 'infraestructura',
         'hosting', 'base de datos', 'seguridad', 'programación', 'programacion', 'código', 'codigo',
-        'soporte técnico', 'soporte tecnico', 'implementar', 'conectar', 'backend', 'frontend'
+        'soporte técnico', 'soporte tecnico', 'implementar', 'conectar', 'backend', 'frontend',
+        'call center', 'centro de llamadas', 'contact center', 'chatbot', 'bot', 'IA', 'AI',
+        'inteligencia artificial', 'machine learning', 'aprendizaje automático', 'automatizar',
+        'automatización', 'procesamiento', 'ivr', 'reconocimiento de voz', 'agentes virtuales',
+        'virtual agent', 'nube', 'cloud', 'SaaS', 'PaaS', 'CCaaS', 'gestión de llamadas',
+        'voip', 'telefonía', 'telefonia', 'comunicaciones', 'omnicanal', 'migración', 'migracion',
+        'proyecto técnico', 'proyecto tecnico', 'solución técnica', 'solucion tecnica'
     ],
     'SalesAgent': [
         'precio', 'costo', 'pagar', 'plan', 'contratar', 'comprar', 'adquirir',
@@ -37,7 +43,10 @@ INTENT_KEYWORDS = {
         'representante', 'asesor', 'registrar', 'visita', 'reunión', 'reunion',
         'demo', 'demostración', 'demostracion', 'prueba', 'gratuita', 'trial',
         'correo', 'dirección', 'direccion', 'móvil', 'movil', 'celular', 'whatsapp',
-        'contactar', 'comunicar', 'comunicarse', 'interesado'
+        'contactar', 'comunicar', 'comunicarse', 'registrarme', 'dejar mis datos', 
+        'ponerse en contacto', 'atención al cliente', 'atencion al cliente', 
+        'personalmente', 'llamada', 'comercial', 'vendedor', 'especialista',
+        'contacten', 'información de contacto', 'informacion de contacto'
     ],
     'GeneralAgent': [
         'hola', 'información', 'informacion', 'ayuda', 'servicio', 'solución', 'solucion',
@@ -54,7 +63,13 @@ INTENT_PHRASES = {
         'cómo funciona', 'como funciona', 'cómo se integra', 'como se integra',
         'cómo se implementa', 'como se implementa', 'necesito ayuda técnica',
         'necesito ayuda tecnica', 'tengo un problema técnico', 'tengo un problema tecnico',
-        'puedo conectar', 'es compatible con', 'requisitos técnicos', 'requisitos tecnicos'
+        'puedo conectar', 'es compatible con', 'requisitos técnicos', 'requisitos tecnicos',
+        'mi proyecto es', 'estoy trabajando en', 'quiero implementar', 'necesito desarrollar',
+        'necesito integrar', 'call center con AI', 'call center con IA', 'centro de llamadas inteligente',
+        'automatizar call center', 'migrar a inteligencia artificial', 'agentes virtuales',
+        'sistema automatizado', 'transformación digital', 'transformacion digital',
+        'contact center en la nube', 'call center en la nube', 'IVR inteligente',
+        'chatbots para atención', 'chatbots para atencion'
     ],
     'SalesAgent': [
         'cuánto cuesta', 'cuanto cuesta', 'qué precio tiene', 'que precio tiene',
@@ -70,7 +85,12 @@ INTENT_PHRASES = {
         'me gustaria hablar con un representante', 'pueden llamarme',
         'quiero una demostración', 'quiero una demostracion',
         'necesito que me contacte un asesor', 'mi correo es', 'mi email es',
-        'mi teléfono es', 'mi telefono es', 'mis datos son', 'quiero dejar mis datos'
+        'mi teléfono es', 'mi telefono es', 'mis datos son', 'quiero dejar mis datos',
+        'contactenme', 'quiero dejar mi información de contacto', 'quiero dejar mi informacion de contacto',
+        'necesito hablar con alguien', 'quiero registrarme', 'quiero que me llamen',
+        'prefiero hablar personalmente', 'necesito atención personalizada', 'necesito atencion personalizada',
+        'programa una llamada', 'agenda una reunión', 'agenda una reunion',
+        'mi nombre es', 'trabajo en la empresa', 'mi empresa es', 'soy de la empresa'
     ]
 }
 
@@ -170,10 +190,66 @@ def apply_context_adjustments(agent_scores, user_message, context):
     """
     message_normalized = user_message.lower()
     
+    # Si el mensaje es muy corto (1-2 palabras) y ya estamos con un agente específico, dar fuerte continuidad
+    is_short_message = len(message_normalized.split()) <= 2
+    if is_short_message and context and 'history' in context and context['history']:
+        last_entry = context['history'][-1] if context['history'] else None
+        if last_entry and 'agent' in last_entry:
+            current_agent = last_entry['agent']
+            # Dar una bonificación muy alta al agente actual para mensajes muy cortos
+            if current_agent in agent_scores:
+                agent_scores[current_agent] += 0.8  # Bonificación muy alta para mensajes cortos
+                return agent_scores  # Devolver inmediatamente para dar fuerte continuidad
+    
     # Reducir significativamente el peso base del DataCollectionAgent para evitar
-    # que capture consultas generales
+    # que capture consultas generales, pero menos agresivamente
     if 'DataCollectionAgent' in agent_scores:
-        agent_scores['DataCollectionAgent'] *= 0.4  # Reducción más agresiva
+        agent_scores['DataCollectionAgent'] *= 0.6  # Reducción menos agresiva
+    
+    # Detectar términos técnicos específicos relacionados con proyectos
+    tech_project_terms = [
+        'proyecto', 'implementar', 'desarrollar', 'integrar', 'call center', 'centro de llamadas',
+        'ai', 'ia', 'inteligencia artificial', 'automatizar', 'automatización', 'automatizacion',
+        'sistema', 'solución', 'solucion', 'migrar', 'migración', 'migracion', 'plataforma',
+        'nube', 'cloud', 'chatbot', 'ivr', 'telefonía', 'telefonia', 'virtual', 'automatizado',
+        'técnico', 'tecnico'
+    ]
+    
+    # Detectar términos específicos relacionados con ventas
+    sales_terms = [
+        'precio', 'costo', 'cotización', 'cotizacion', 'presupuesto', 'venta', 'comercial',
+        'comprar', 'contratar', 'adquirir', 'euros', 'dollars', 'pagar', 'payment', 'coste',
+        'oferta', 'descuento', 'promoción', 'promocion', 'plan', 'tarifa', 'paquete',
+        'suscripción', 'suscripcion', 'licencia', 'contrato', 'factura', 'facturación'
+    ]
+    
+    # Verificar si es una discusión sobre un proyecto técnico
+    is_tech_project = any(term in message_normalized for term in tech_project_terms)
+    
+    # Verificar si es un mensaje relacionado con ventas
+    is_sales_message = any(term in message_normalized for term in sales_terms)
+    
+    # Si estamos hablando de proyectos técnicos, dar fuerte prioridad al EngineerAgent
+    if is_tech_project:
+        if 'EngineerAgent' in agent_scores:
+            agent_scores['EngineerAgent'] += 0.6  # Fuerte aumento para proyectos técnicos
+        
+        # Reducir otros agentes para casos de proyectos técnicos
+        if 'GeneralAgent' in agent_scores:
+            agent_scores['GeneralAgent'] -= 0.3
+        if 'SalesAgent' in agent_scores:
+            agent_scores['SalesAgent'] -= 0.2
+    
+    # Si estamos hablando de ventas o precios, dar fuerte prioridad al SalesAgent
+    if is_sales_message:
+        if 'SalesAgent' in agent_scores:
+            agent_scores['SalesAgent'] += 0.6  # Fuerte aumento para temas de ventas
+        
+        # Reducir otros agentes para casos de ventas
+        if 'GeneralAgent' in agent_scores:
+            agent_scores['GeneralAgent'] -= 0.3
+        if 'EngineerAgent' in agent_scores:
+            agent_scores['EngineerAgent'] -= 0.2
     
     # 1. Verificar consultas de información general que deben ir al GeneralAgent
     general_info_patterns = [
@@ -182,39 +258,49 @@ def apply_context_adjustments(agent_scores, user_message, context):
     ]
     
     is_info_query = any(pattern in message_normalized for pattern in general_info_patterns)
-    if is_info_query and len(message_normalized.split()) < 15:
-        # Es probablemente una consulta de información
+    if is_info_query and len(message_normalized.split()) < 15 and not is_tech_project and not is_sales_message:
+        # Es probablemente una consulta de información general (no técnica ni de ventas)
         if 'GeneralAgent' in agent_scores:
             agent_scores['GeneralAgent'] += 0.3  # Aumentar más
         if 'DataCollectionAgent' in agent_scores:
-            agent_scores['DataCollectionAgent'] -= 0.7  # Reducir más agresivamente
+            agent_scores['DataCollectionAgent'] -= 0.4  # Reducir menos agresivamente
     
     # 2. Verificar si es un mensaje corto o inicial
-    if len(message_normalized.split()) <= 3:
-        # Mensajes muy cortos generalmente son mejor manejados por el agente general
+    if len(message_normalized.split()) <= 3 and not is_tech_project and not is_sales_message:
+        # Mantener continuidad para mensajes cortos
+        if context and 'history' in context and context['history']:
+            last_entry = context['history'][-1] if context['history'] else None
+            if last_entry and 'agent' in last_entry:
+                current_agent = last_entry['agent']
+                if current_agent in agent_scores:
+                    agent_scores[current_agent] += 0.5  # Alta bonificación para continuidad
+                    return agent_scores  # Priorizar continuidad para mensajes cortos
+        
+        # Si no hay contexto previo, mensajes muy cortos generalmente son mejor manejados por el agente general
         if 'GeneralAgent' in agent_scores:
             agent_scores['GeneralAgent'] += 0.25  # Aumentar más
         if 'DataCollectionAgent' in agent_scores:
-            agent_scores['DataCollectionAgent'] -= 0.5  # Reducir más
+            agent_scores['DataCollectionAgent'] -= 0.3  # Reducir menos
     
     # 3. Detectar explícitamente solicitudes de cotización para SalesAgent
-    quote_terms = ['cotizar', 'cotización', 'precio', 'costo', 'valor', 'planes', 'oferta']
+    quote_terms = ['cotizar', 'cotización', 'precio', 'costo', 'valor', 'planes', 'oferta', 'presupuesto']
     if any(term in message_normalized for term in quote_terms):
         if 'SalesAgent' in agent_scores:
-            agent_scores['SalesAgent'] += 0.5  # Prioridad alta
+            agent_scores['SalesAgent'] += 0.7  # Prioridad muy alta
         if 'DataCollectionAgent' in agent_scores:
-            agent_scores['DataCollectionAgent'] -= 0.4  # Reducir
+            agent_scores['DataCollectionAgent'] -= 0.3  # Reducir menos
     
     # 4. Detectar explícitamente solicitudes de demostración o contacto
-    contact_terms = ['contactar', 'llamar', 'contacto', 'teléfono', 'email', 'correo']
+    contact_terms = ['contactar', 'llamar', 'contacto', 'teléfono', 'email', 'correo', 'datos', 
+                     'información de contacto', 'dejar datos', 'registrarme', 'formulario']
     demo_terms = ['demostración', 'demo', 'probar', 'prueba']
     
     is_contact_request = any(term in message_normalized for term in contact_terms)
     is_demo_request = any(term in message_normalized for term in demo_terms)
     
-    # Solo aumentar DataCollectionAgent si es explícitamente una solicitud de contacto o demo
+    # Aumentar significativamente DataCollectionAgent si es una solicitud de contacto o demo
     if (is_contact_request or is_demo_request) and 'DataCollectionAgent' in agent_scores:
-        agent_scores['DataCollectionAgent'] += 0.4
+        agent_scores['DataCollectionAgent'] += 0.8  # Aumentar más (era 0.4)
     
     # 5. Mantener continuidad de conversación con el agente actual
     if context and 'history' in context and context['history']:
@@ -222,9 +308,16 @@ def apply_context_adjustments(agent_scores, user_message, context):
         if last_entry and 'agent' in last_entry:
             current_agent = last_entry['agent']
             
-            # Si el mensaje es corto, favorece continuar con el mismo agente
-            if len(message_normalized.split()) < 5 and current_agent in agent_scores:
-                agent_scores[current_agent] += 0.2
+            # Dar fuerte continuidad a conversaciones técnicas
+            if current_agent == 'EngineerAgent' and is_tech_project:
+                agent_scores['EngineerAgent'] += 0.7  # Fuerte incentivo para mantener el agente técnico
+            # Dar fuerte continuidad a conversaciones de ventas
+            elif current_agent == 'SalesAgent' and is_sales_message:
+                agent_scores['SalesAgent'] += 0.7  # Fuerte incentivo para mantener el agente de ventas
+            # Para conversaciones generales, dar menos peso a la continuidad  
+            elif len(message_normalized.split()) < 8:
+                if current_agent in agent_scores:
+                    agent_scores[current_agent] += 0.2
     
     # Registro para depuración
     logger.debug(f"Agent scores after context adjustment: {agent_scores}")

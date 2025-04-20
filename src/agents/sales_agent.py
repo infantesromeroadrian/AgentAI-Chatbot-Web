@@ -3,7 +3,7 @@ Agente de ventas para el chatbot de Alisys.
 Este agente se encarga de proporcionar información sobre precios, planes y
 cotizaciones para los servicios de Alisys.
 """
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Generator
 from .base_agent import BaseAgent
 import logging
 
@@ -184,3 +184,143 @@ Historial de conversación:
             formatted_info += f"- {formatted_key}: {value}\n"
         
         return formatted_info 
+
+    def can_handle(self, message: str, context: Dict[str, Any]) -> float:
+        """
+        Determina la confianza del agente para manejar el mensaje.
+        
+        Args:
+            message: El mensaje del usuario
+            context: Contexto de la conversación
+            
+        Returns:
+            Un valor entre 0 y 1 que indica la confianza
+        """
+        # Palabras clave relacionadas con ventas, costos y presupuestos
+        sales_keywords = [
+            'presupuesto', 'precio', 'costo', 'coste', 'inversión', 'inversion',
+            'tarifa', 'cotización', 'cotizacion', 'propuesta', 'oferta',
+            'comercial', 'contrato', 'plan', 'paquete', 'servicio',
+            'comprar', 'adquirir', 'implementar', 'contratar', 'vender'
+        ]
+        
+        # Inicializar con un valor base
+        confidence = 0.1
+        
+        # Verificar si viene de análisis técnico - aumentar confianza significativamente
+        if context.get('project_info', {}).get('has_file_analysis') and "presupuesto" in message.lower():
+            confidence += 0.6
+        
+        # Aumentar confianza si hay términos de ventas
+        message_lower = message.lower()
+        for keyword in sales_keywords:
+            if keyword in message_lower:
+                confidence += 0.2
+                # Evitar valores mayores a 1
+                if confidence >= 1.0:
+                    return 1.0
+        
+        # Si hay una pregunta específica sobre costos o precios
+        cost_patterns = [
+            'cuánto cuesta', 'cuanto cuesta', 'precio de', 'costo de', 'coste de',
+            'qué precio', 'que precio', 'qué costo', 'que costo', 'valor de',
+            'presupuesto para', 'cuánto vale', 'cuanto vale', 'tarifas', 'planes',
+            'paquetes', 'opciones', 'comparación de precios', 'comparacion de precios',
+            'descuento', 'oferta', 'promoción', 'promocion'
+        ]
+        
+        for pattern in cost_patterns:
+            if pattern in message_lower:
+                confidence += 0.3
+                # Evitar valores mayores a 1
+                if confidence >= 1.0:
+                    return 1.0
+        
+        # Verificar si hay términos relacionados con contratación o cierre de venta
+        closing_patterns = [
+            'contratar', 'contratación', 'contratacion', 'comprar', 'adquirir',
+            'siguiente paso', 'proceso de compra', 'forma de pago', 'método de pago',
+            'metodo de pago', 'facturación', 'facturacion', 'términos', 'terminos',
+            'condiciones', 'contrato', 'acuerdo', 'cerrar', 'cierre'
+        ]
+        
+        for pattern in closing_patterns:
+            if pattern in message_lower:
+                confidence += 0.3
+                # Evitar valores mayores a 1
+                if confidence >= 1.0:
+                    return 1.0
+                    
+        return min(confidence, 1.0)
+
+    def process(self, message: str, context: Dict[str, Any]) -> Generator[str, None, None]:
+        """
+        Procesa un mensaje y genera una respuesta relacionada con ventas.
+        
+        Args:
+            message: El mensaje del usuario
+            context: Contexto de la conversación
+            
+        Returns:
+            Un generador que produce partes de la respuesta
+        """
+        # Verificar si tenemos análisis técnico para utilizarlo en la generación de presupuesto
+        has_tech_analysis = context.get('project_info', {}).get('has_file_analysis', False)
+        
+        # Obtener mensajes previos para contexto
+        messages = self._get_conversation_history(context)
+        
+        # Añadir el sistema prompt específico para este agente
+        system_prompt = self._get_system_prompt(context)
+        
+        # Si tenemos análisis técnico, agregar información al sistema prompt
+        if has_tech_analysis and "presupuesto" in message.lower():
+            tech_analysis = context.get('project_info', {}).get('technical_analysis', {})
+            tech_info = self._format_technical_analysis_for_sales(tech_analysis)
+            
+            system_prompt += f"\n\n{tech_info}"
+            
+            # Ajustar el mensaje del usuario para indicar que debe usar el análisis técnico
+            if "presupuesto" in message.lower():
+                message = f"Utilizando el análisis técnico anterior, por favor genera un presupuesto detallado para el proyecto. {message}"
+        
+        messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": message})
+        
+        # Generar la respuesta
+        for response_chunk in self._call_llm(messages, context):
+            yield response_chunk
+
+    def _format_technical_analysis_for_sales(self, tech_analysis: Dict[str, str]) -> str:
+        """
+        Formatea el análisis técnico para el agente de ventas.
+        
+        Args:
+            tech_analysis: Diccionario con información técnica relevante
+            
+        Returns:
+            Texto formateado para incluir en el sistema prompt
+        """
+        if not tech_analysis:
+            return ""
+            
+        result = "INFORMACIÓN TÉCNICA DEL PROYECTO PARA ELABORACIÓN DE PRESUPUESTO:\n\n"
+        
+        if tech_analysis.get("technologies"):
+            result += "TECNOLOGÍAS A UTILIZAR:\n" + tech_analysis["technologies"] + "\n\n"
+            
+        if tech_analysis.get("timeline"):
+            result += "ESTIMACIÓN DE TIEMPOS:\n" + tech_analysis["timeline"] + "\n\n"
+            
+        if tech_analysis.get("resources"):
+            result += "RECURSOS NECESARIOS:\n" + tech_analysis["resources"] + "\n\n"
+            
+        if tech_analysis.get("challenges"):
+            result += "DESAFÍOS TÉCNICOS:\n" + tech_analysis["challenges"] + "\n\n"
+            
+        if tech_analysis.get("budget_factors"):
+            result += "FACTORES RELEVANTES PARA EL PRESUPUESTO:\n" + tech_analysis["budget_factors"] + "\n\n"
+            
+        result += "Usa esta información técnica detallada para elaborar un presupuesto preciso y completo que incluya todas las fases de desarrollo, recursos necesarios y consideraciones especiales basadas en los desafíos técnicos identificados."
+        
+        return result 

@@ -268,6 +268,114 @@
                 bottom: auto;
             }
         }
+        
+        .file-upload-container {
+            background-color: var(--bg-color-secondary);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .file-upload-header i {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        
+        .file-upload-description {
+            font-size: 14px;
+            margin-bottom: 15px;
+            color: var(--text-color);
+        }
+        
+        .file-input-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            padding: 8px 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .file-input-label:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        
+        .file-input-label i {
+            margin-right: 8px;
+        }
+        
+        .file-name-display {
+            padding: 8px 15px;
+            background-color: white;
+            border-radius: 5px;
+            flex-grow: 1;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+        
+        .upload-file-button {
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .upload-file-button:hover:not([disabled]) {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        
+        .upload-file-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        @media (max-width: 768px) {
+            .file-input-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .file-input-label, .file-name-display {
+                width: 100%;
+                margin-right: 0;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -304,6 +412,28 @@
         </div>
         
         <div id="chat-container" class="chat-container"></div>
+        
+        <!-- Componente de carga de archivos para el agente técnico -->
+        <div id="file-upload-container" class="file-upload-container" style="display: none;">
+            <div class="file-upload-header">
+                <i class="fas fa-file-upload"></i>
+                <span>Cargar archivo de proyecto</span>
+            </div>
+            <div class="file-upload-description">
+                Carga un archivo TXT o PDF con los detalles de tu proyecto para que nuestro agente técnico pueda hacer una estimación más precisa.
+            </div>
+            <form id="file-upload-form" enctype="multipart/form-data">
+                <div class="file-input-container">
+                    <input type="file" id="project-file" name="project-file" accept=".txt,.pdf" class="file-input">
+                    <label for="project-file" class="file-input-label">
+                        <i class="fas fa-plus"></i>
+                        <span>Seleccionar archivo</span>
+                    </label>
+                    <div id="file-name-display" class="file-name-display">Ningún archivo seleccionado</div>
+                </div>
+                <button type="button" id="upload-file-button" class="upload-file-button" disabled>Enviar archivo</button>
+            </form>
+        </div>
         
         <div class="input-container">
             <input type="text" id="user-input" placeholder="Escribe tu mensaje..." autocomplete="off">

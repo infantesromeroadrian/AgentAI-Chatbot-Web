@@ -44,6 +44,11 @@ let suggestedQuestionsPool = {
     ]
 };
 
+// Añadir variables globales para manejar archivos
+let uploadedFileContent = null;
+let uploadedFileName = null;
+let lastFileUploadTime = null;
+
 // Inicializar el chat con un mensaje de bienvenida
 document.addEventListener('DOMContentLoaded', function() {
     addBotMessage("¡Hola! Soy el asistente virtual de Alisys. ¿En qué puedo ayudarte hoy?");
@@ -60,6 +65,14 @@ document.addEventListener('DOMContentLoaded', function() {
             sendMessage();
         }
     });
+    
+    // Añadir el evento click al botón de envío
+    document.getElementById('send-button').addEventListener('click', function() {
+        sendMessage();
+    });
+    
+    // Configurar el selector de archivos
+    setupFileUpload();
     
     // Si estamos en modo agentes, configurar el botón de información
     if (useAgents) {
@@ -93,6 +106,132 @@ document.addEventListener('DOMContentLoaded', function() {
     // Crear botón de retroalimentación de voz
     createVoiceFeedbackButton();
 });
+
+// Configurar el selector de archivos
+function setupFileUpload() {
+    const fileInput = document.getElementById('project-file');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const uploadButton = document.getElementById('upload-file-button');
+    
+    if (!fileInput || !fileNameDisplay || !uploadButton) return;
+    
+    // Mostrar el nombre del archivo seleccionado
+    fileInput.addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            const file = this.files[0];
+            fileNameDisplay.textContent = file.name;
+            uploadButton.disabled = false;
+            
+            // Verificar el tipo de archivo
+            const fileType = file.type;
+            if (fileType !== 'text/plain' && fileType !== 'application/pdf') {
+                addBotMessage("⚠️ Por favor, sube solo archivos TXT o PDF.", "EngineerAgent");
+                uploadButton.disabled = true;
+                return;
+            }
+            
+            // Verificar el tamaño del archivo (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                addBotMessage("⚠️ El archivo es demasiado grande. Por favor, sube un archivo menor a 5MB.", "EngineerAgent");
+                uploadButton.disabled = true;
+                return;
+            }
+        } else {
+            fileNameDisplay.textContent = "Ningún archivo seleccionado";
+            uploadButton.disabled = true;
+        }
+    });
+    
+    // Manejar la carga del archivo
+    uploadButton.addEventListener('click', function() {
+        if (fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            
+            // Mostrar mensaje de carga
+            addUserMessage(`Subiendo archivo: ${file.name}`);
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                // Si es un PDF, enviar al servidor para procesarlo
+                if (file.type === 'application/pdf') {
+                    processPdfFile(file);
+                } else {
+                    // Si es un TXT, procesar directamente
+                    uploadedFileContent = e.target.result;
+                    uploadedFileName = file.name;
+                    lastFileUploadTime = Date.now();
+                    
+                    // Enviar el contenido del archivo al agente técnico
+                    sendFileContent(uploadedFileContent, uploadedFileName);
+                }
+                
+                // Resetear el formulario
+                document.getElementById('file-upload-form').reset();
+                fileNameDisplay.textContent = "Ningún archivo seleccionado";
+                uploadButton.disabled = true;
+            };
+            
+            reader.onerror = function() {
+                addBotMessage("❌ Error al leer el archivo. Por favor, inténtalo de nuevo.", "EngineerAgent");
+            };
+            
+            // Leer el archivo como texto
+            if (file.type === 'text/plain') {
+                reader.readAsText(file);
+            } else {
+                // Para PDFs, leer como ArrayBuffer
+                reader.readAsArrayBuffer(file);
+            }
+        }
+    });
+}
+
+// Función para procesar archivos PDF
+function processPdfFile(file) {
+    // Crear un FormData para enviar el archivo
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Enviar el archivo al servidor
+    fetch('/process-pdf', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            uploadedFileContent = data.text;
+            uploadedFileName = file.name;
+            lastFileUploadTime = Date.now();
+            
+            // Enviar el contenido del archivo al agente técnico
+            sendFileContent(uploadedFileContent, uploadedFileName);
+        } else {
+            addBotMessage(`❌ Error al procesar el PDF: ${data.error}`, "EngineerAgent");
+        }
+    })
+    .catch(error => {
+        addBotMessage("❌ Error al enviar el archivo al servidor. Por favor, inténtalo de nuevo.", "EngineerAgent");
+        console.error('Error:', error);
+    });
+}
+
+// Función para enviar el contenido del archivo al agente técnico
+function sendFileContent(content, filename) {
+    // Limitar a los primeros 2000 caracteres para la visualización
+    const previewContent = content.length > 2000 ? content.substring(0, 2000) + "... [contenido truncado]" : content;
+    
+    // Mostrar vista previa del archivo
+    addBotMessage(`📄 Archivo recibido: **${filename}**\n\n` +
+                 "Vista previa del contenido:\n" +
+                 "```\n" + previewContent + "\n```\n\n" +
+                 "Procesando el archivo para hacer una estimación detallada...", "EngineerAgent");
+    
+    // Enviar el contenido al agente para análisis
+    const message = `ANALYSIS_REQUEST: Archivo de proyecto '${filename}' cargado con el siguiente contenido:\n\n${content}`;
+    sendMessage(message, true); // true para ocultar el mensaje del usuario
+}
 
 // Configura el reconocimiento de voz si está disponible en el navegador
 function setupSpeechRecognition() {
@@ -128,12 +267,13 @@ function setupSpeechRecognition() {
 
 // Crea un botón flotante para la entrada de voz
 function createVoiceFeedbackButton() {
+    // Siempre crear el botón, incluso si recognition no está disponible
+    const voiceButton = document.createElement('div');
+    voiceButton.className = 'voice-feedback';
+    voiceButton.innerHTML = '<i class="fas fa-microphone"></i>';
+    voiceButton.title = 'Habla para enviar un mensaje';
+    
     if (recognition) {
-        const voiceButton = document.createElement('div');
-        voiceButton.className = 'voice-feedback';
-        voiceButton.innerHTML = '<i class="fas fa-microphone"></i>';
-        voiceButton.title = 'Habla para enviar un mensaje';
-        
         voiceButton.addEventListener('click', function() {
             if (!isListening) {
                 try {
@@ -148,9 +288,14 @@ function createVoiceFeedbackButton() {
             }
             updateVoiceFeedbackState();
         });
-        
-        document.body.appendChild(voiceButton);
+    } else {
+        // Si no está disponible recognition, mostrar mensaje
+        voiceButton.addEventListener('click', function() {
+            alert('El reconocimiento de voz no está disponible en este navegador.');
+        });
     }
+    
+    document.body.appendChild(voiceButton);
 }
 
 // Actualiza el estado visual del botón de voz
@@ -167,12 +312,13 @@ function updateVoiceFeedbackState() {
     }
 }
 
-// Actualiza el indicador de agente actual
+// Actualiza el indicador de agente actual y maneja la visibilidad del componente de carga de archivos
 function updateCurrentAgentIndicator(agentId) {
     if (!useAgents) return;
     
     const indicator = document.getElementById('current-agent-indicator');
     const nameElement = document.getElementById('current-agent-name');
+    const fileUploadContainer = document.getElementById('file-upload-container');
     
     if (indicator && nameElement) {
         const agentInfo = agentsInfo[agentId] || { 
@@ -196,6 +342,15 @@ function updateCurrentAgentIndicator(agentId) {
         
         // Actualizar sugerencias basadas en el agente actual
         updateSuggestionChips(agentId);
+        
+        // Mostrar/ocultar el componente de carga de archivos según el agente
+        if (fileUploadContainer) {
+            if (agentId === 'EngineerAgent') {
+                fileUploadContainer.style.display = 'block';
+            } else {
+                fileUploadContainer.style.display = 'none';
+            }
+        }
         
         // Añadir animación
         indicator.classList.add('agent-change-animation');
@@ -341,6 +496,34 @@ function sendMessage(customMessage = null, hidden = false) {
         return;
     }
     
+    // Verificar si este mensaje es sobre un proyecto técnico o específicamente de call center con IA
+    const techKeywords = [
+        'proyecto', 'implementar', 'desarrollar', 'integrar', 'call center', 'centro de llamadas',
+        'ai', 'ia', 'inteligencia artificial', 'automatizar', 'automatización', 'automatizacion',
+        'sistema', 'solución', 'solucion', 'migrar', 'migración', 'migracion', 'técnico', 'tecnico'
+    ];
+    
+    const message_lower = message.toLowerCase();
+    let forceTechnicalAgent = false;
+    
+    // Detectar si es específicamente sobre un proyecto técnico de call center con IA
+    if (message_lower.includes('call center') || 
+        message_lower.includes('centro de llamadas') || 
+        message_lower.includes('contact center')) {
+        
+        if (message_lower.includes('proyecto') || 
+            message_lower.includes('mi proyecto') || 
+            message_lower.includes('ia') || 
+            message_lower.includes('ai') || 
+            message_lower.includes('inteligencia artificial') ||
+            message_lower.includes('agentes') ||
+            message_lower.includes('automatizar')) {
+            
+            forceTechnicalAgent = true;
+            console.log("Detectado proyecto técnico de call center con IA - forzando agente técnico");
+        }
+    }
+    
     // Deshabilitar entrada mientras procesa
     document.getElementById('user-input').disabled = true;
     document.getElementById('send-button').disabled = true;
@@ -365,8 +548,15 @@ function sendMessage(customMessage = null, hidden = false) {
     const avatar = document.createElement('div');
     avatar.className = 'avatar bot-avatar';
     
-    // Usar el icono según el agente actual
-    const agentInfo = agentsInfo[currentAgent] || { 
+    // Usar el icono según el agente actual o forzar el agente técnico
+    let agentToUse = currentAgent;
+    
+    // Si se detectó un proyecto técnico de call center, forzar el agente técnico
+    if (forceTechnicalAgent) {
+        agentToUse = "EngineerAgent";
+    }
+    
+    const agentInfo = agentsInfo[agentToUse] || { 
         icon: 'fas fa-robot',
         color: '#607D8B'
     };
@@ -401,8 +591,20 @@ function sendMessage(customMessage = null, hidden = false) {
         suggestionsContainer.style.display = 'none';
     }
     
+    // Construir la URL con el mensaje y el agente actual (si es forzado)
+    let streamUrl = chatEndpoint + '?message=' + encodeURIComponent(message);
+    
+    // Si detectamos proyecto técnico, forzar el uso del agente técnico
+    if (forceTechnicalAgent) {
+        streamUrl += '&current_agent=EngineerAgent';
+    } 
+    // Si ya estamos con el agente técnico, mantenerlo para asegurar continuidad
+    else if (currentAgent === 'EngineerAgent') {
+        streamUrl += '&current_agent=EngineerAgent';
+    }
+    
     // Usar streaming para la respuesta
-    const eventSource = new EventSource(chatEndpoint + '?message=' + encodeURIComponent(message));
+    const eventSource = new EventSource(streamUrl);
     let fullResponse = '';
     
     eventSource.onmessage = function(event) {
@@ -718,6 +920,22 @@ function sendChatRequest(message) {
     document.getElementById('status-indicator').className = 'status-indicator status-thinking';
     document.getElementById('status').textContent = 'Generando respuesta...';
     
+    // Verificar si este mensaje es sobre un proyecto técnico, específicamente call center con IA
+    const techKeywords = [
+        'proyecto', 'call center', 'centro de llamadas', 'ai', 'ia', 'inteligencia artificial'
+    ];
+    
+    const message_lower = message.toLowerCase();
+    let forceTechnicalAgent = false;
+    
+    // Si es un mensaje técnico o un cambio explícito al agente técnico
+    if (message.startsWith('!cambiar_agente:EngineerAgent') || 
+        (message_lower.includes('call center') && 
+         (message_lower.includes('ia') || message_lower.includes('ai') || message_lower.includes('proyecto')))) {
+        forceTechnicalAgent = true;
+        console.log("Mensaje técnico detectado - forzando agente técnico");
+    }
+    
     // Preparar para respuesta del bot
     currentResponseElement = document.createElement('div');
     currentResponseElement.className = 'message bot-message';
@@ -725,8 +943,10 @@ function sendChatRequest(message) {
     const messageHeader = document.createElement('div');
     messageHeader.className = 'message-header';
     
-    // Usar el icono según el agente actual
-    const agentInfo = agentsInfo[currentAgent] || { 
+    // Usar el icono según el agente actual o forzar técnico
+    let agentToUse = forceTechnicalAgent ? "EngineerAgent" : currentAgent;
+    
+    const agentInfo = agentsInfo[agentToUse] || { 
         icon: 'fas fa-robot',
         color: '#607D8B'
     };
@@ -759,8 +979,16 @@ function sendChatRequest(message) {
     // Añadir al chat
     document.getElementById('chat-container').appendChild(currentResponseElement);
     
+    // Construir URL con información del agente si es necesario
+    let streamUrl = chatEndpoint + '?message=' + encodeURIComponent(message);
+    
+    // Si se detectó contenido técnico o estamos forzando el agente técnico
+    if (forceTechnicalAgent) {
+        streamUrl += '&current_agent=EngineerAgent';
+    }
+    
     // Usar streaming para la respuesta
-    const eventSource = new EventSource(chatEndpoint + '?message=' + encodeURIComponent(message));
+    const eventSource = new EventSource(streamUrl);
     let fullResponse = '';
     
     eventSource.onmessage = function(event) {

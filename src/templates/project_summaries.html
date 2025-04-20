@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resúmenes de Proyectos - Alisys</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --secondary-color: #0D47A1;
+            --accent-color: #FF9800;
+            --danger-color: #f44336;
+            --success-color: #4CAF50;
+            --light-color: #F5F5F5;
+            --dark-color: #212121;
+            --text-color: #333333;
+            --border-color: #E0E0E0;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--light-color);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: 500;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .filters {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .search-box {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background-color: var(--light-color);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        
+        .search-box input {
+            border: none;
+            padding: 10px;
+            width: 100%;
+            outline: none;
+            background-color: transparent;
+        }
+        
+        .search-box button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+        
+        .summaries-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .summaries-table th,
+        .summaries-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .summaries-table th {
+            background-color: var(--light-color);
+            font-weight: 500;
+            color: var(--text-color);
+        }
+        
+        .summaries-table tr:hover {
+            background-color: rgba(33, 150, 243, 0.05);
+        }
+        
+        .btn {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow: auto;
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 50px auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+        
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+        
+        .close-button:hover {
+            color: var(--danger-color);
+        }
+        
+        .modal-header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .summary-content {
+            white-space: pre-wrap;
+            font-family: monospace;
+            background-color: var(--light-color);
+            padding: 15px;
+            border-radius: 4px;
+            overflow: auto;
+            max-height: 60vh;
+        }
+        
+        .no-summaries {
+            text-align: center;
+            padding: 30px;
+            color: #757575;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: white;
+            background-color: var(--primary-color);
+        }
+        
+        .badge-success {
+            background-color: var(--success-color);
+        }
+        
+        .badge-warning {
+            background-color: var(--accent-color);
+        }
+        
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .summaries-table {
+                font-size: 14px;
+            }
+            
+            .summaries-table th:nth-child(3),
+            .summaries-table td:nth-child(3) {
+                display: none;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 20px auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-file-alt"></i> Resúmenes de Proyectos - Alisys</h1>
+            <a href="/admin/leads" class="btn"><i class="fas fa-users"></i> Ver Leads</a>
+        </header>
+        
+        <div class="content">
+            <div class="filters">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Buscar por nombre, email o empresa...">
+                    <button id="search-button" title="Buscar"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            
+            {% if summaries %}
+            <table class="summaries-table" id="summaries-table">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Email</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for summary in summaries %}
+                    <tr data-summary="{{ loop.index }}">
+                        {% set client_name = summary.summary.split('Nombre:')[1].split('\n')[0].strip() if 'Nombre:' in summary.summary else 'No disponible' %}
+                        {% set has_file = 'subió archivo' in summary.summary %}
+                        {% set has_analysis = 'ANÁLISIS TÉCNICO' in summary.summary %}
+                        <td>{{ client_name }}</td>
+                        <td>{{ summary.email }}</td>
+                        <td>{{ summary.modified_date }}</td>
+                        <td>
+                            {% if has_analysis %}
+                            <span class="badge badge-success">Análisis completo</span>
+                            {% elif has_file %}
+                            <span class="badge badge-warning">Archivo subido</span>
+                            {% else %}
+                            <span class="badge">Solo datos</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-small view-summary" data-summary="{{ loop.index }}">
+                                <i class="fas fa-eye"></i> Ver resumen
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-summaries">
+                <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <p>No hay resúmenes de proyectos disponibles.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Modal para mostrar el resumen completo -->
+    <div id="summary-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-modal">&times;</span>
+            <div class="modal-header">
+                <h2>Resumen del Proyecto</h2>
+            </div>
+            <div class="summary-content" id="modal-summary-content"></div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Almacenar todos los resúmenes
+            const summaries = [
+                {% for summary in summaries %}
+                {
+                    id: {{ loop.index }},
+                    email: "{{ summary.email }}",
+                    content: `{{ summary.summary | replace('"', '\\"') | replace('\n', '\\n') }}`,
+                    modified_date: "{{ summary.modified_date }}"
+                },
+                {% endfor %}
+            ];
+            
+            // Función para mostrar el modal con el resumen
+            function showSummaryModal(summaryId) {
+                const summary = summaries.find(s => s.id === summaryId);
+                if (summary) {
+                    document.getElementById('modal-summary-content').textContent = summary.content;
+                    document.getElementById('summary-modal').style.display = 'block';
+                }
+            }
+            
+            // Configurar botones para ver resúmenes
+            document.querySelectorAll('.view-summary').forEach(button => {
+                button.addEventListener('click', function() {
+                    const summaryId = parseInt(this.getAttribute('data-summary'));
+                    showSummaryModal(summaryId);
+                });
+            });
+            
+            // Cerrar modal
+            document.getElementById('close-modal').addEventListener('click', function() {
+                document.getElementById('summary-modal').style.display = 'none';
+            });
+            
+            // Cerrar modal al hacer clic fuera del contenido
+            window.addEventListener('click', function(event) {
+                if (event.target === document.getElementById('summary-modal')) {
+                    document.getElementById('summary-modal').style.display = 'none';
+                }
+            });
+            
+            // Funcionalidad de búsqueda
+            document.getElementById('search-button').addEventListener('click', searchSummaries);
+            document.getElementById('search-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchSummaries();
+                }
+            });
+            
+            function searchSummaries() {
+                const searchTerm = document.getElementById('search-input').value.toLowerCase();
+                const rows = document.querySelectorAll('#summaries-table tbody tr');
+                
+                rows.forEach(row => {
+                    const summaryId = parseInt(row.getAttribute('data-summary'));
+                    const summary = summaries.find(s => s.id === summaryId);
+                    
+                    if (summary) {
+                        const matchesSearch = summary.content.toLowerCase().includes(searchTerm) || 
+                                             summary.email.toLowerCase().includes(searchTerm);
+                        
+                        row.style.display = matchesSearch ? '' : 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html> 

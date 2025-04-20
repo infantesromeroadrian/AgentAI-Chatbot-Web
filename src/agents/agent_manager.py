@@ -114,12 +114,12 @@ class AgentManager:
         selected_agent = None
         selected_agent_name = None
         
-        # Umbrales específicos por agente (más alto para DataCollectionAgent)
+        # Umbrales específicos por agente (ajustados para mayor consistencia)
         thresholds = {
-            'DataCollectionAgent': 0.95,  # Umbral extremadamente alto para recolección de datos
-            'SalesAgent': 0.6,
-            'EngineerAgent': 0.6,
-            'GeneralAgent': 0.4   # El GeneralAgent puede tener un umbral más bajo
+            'DataCollectionAgent': 0.55,  # Umbral reducido para el agente de recopilación de datos
+            'SalesAgent': 0.5,           # Umbrales reducidos
+            'EngineerAgent': 0.5,
+            'GeneralAgent': 0.4          # El GeneralAgent puede tener un umbral más bajo
         }
         
         for agent in self.agents:
@@ -268,8 +268,92 @@ class AgentManager:
         # Actualizar contexto y añadir el mensaje
         working_context = self._prepare_context(message, context)
         
-        # Obtener el agente adecuado
-        agent = self.select_agent(message, working_context)
+        # Verificar si se debe forzar el uso del EngineerAgent (nuevo)
+        if working_context.get('force_engineer', False):
+            # Buscar directamente el EngineerAgent
+            logger.info("Forzando el uso del EngineerAgent por flag force_engineer")
+            agent = next((a for a in self.agents if a.__class__.__name__ == 'EngineerAgent'), None)
+            # Actualizar contexto
+            if agent:
+                working_context['current_agent'] = 'EngineerAgent'
+            # Si no se encuentra el EngineerAgent, usar el flujo normal
+            if not agent:
+                logger.warning("No se encontró EngineerAgent a pesar de force_engineer=True")
+                agent = self.select_agent(message, working_context)
+        # Verificar si se debe forzar el uso del SalesAgent
+        elif working_context.get('force_sales', False):
+            # Buscar directamente el SalesAgent
+            logger.info("Forzando el uso del SalesAgent por flag force_sales")
+            agent = next((a for a in self.agents if a.__class__.__name__ == 'SalesAgent'), None)
+            # Actualizar contexto
+            if agent:
+                working_context['current_agent'] = 'SalesAgent'
+            # Si no se encuentra el SalesAgent, usar el flujo normal
+            if not agent:
+                logger.warning("No se encontró SalesAgent a pesar de force_sales=True")
+                agent = self.select_agent(message, working_context)
+        else:
+            # Verificar si estamos en una conversación técnica en progreso
+            tech_keywords = [
+                'proyecto', 'implementar', 'desarrollar', 'integrar', 'call center', 'centro de llamadas',
+                'ai', 'ia', 'inteligencia artificial', 'automatizar', 'automatización', 'automatizacion',
+                'sistema', 'solución', 'solucion', 'migrar', 'migración', 'migracion', 'plataforma'
+            ]
+            
+            # Palabras clave más específicas para proyectos de call center con IA
+            call_center_ai_keywords = [
+                'call center', 'centro de llamadas', 'contact center', 'gestiona llamadas', 
+                'gestionar llamadas', 'mi proyecto es', 'pasarlo a agentes de ai', 
+                'agentes virtuales', 'ia', 'ai', 'inteligencia artificial', 'bot', 'chatbot'
+            ]
+            
+            message_lower = message.lower()
+            
+            # Obtener el agente actual del contexto
+            current_agent_name = working_context.get('current_agent')
+            
+            # Verificar si estamos en casos que requieren forzar EngineerAgent
+            force_engineer_agent = False
+            
+            # Caso 1: Ya estamos en una conversación técnica con EngineerAgent
+            if current_agent_name == 'EngineerAgent' and any(keyword in message_lower for keyword in tech_keywords):
+                force_engineer_agent = True
+                logger.info("Manteniendo EngineerAgent para conversación técnica en curso")
+            
+            # Caso 2: Mensaje contiene palabras clave específicas de proyectos de call center con IA
+            if any(keyword in message_lower for keyword in call_center_ai_keywords):
+                # Verificar si hay combinaciones de palabras clave que indiquen claramente un proyecto técnico
+                if ('proyecto' in message_lower and any(kw in message_lower for kw in ['call center', 'ai', 'ia'])) or \
+                   ('mi proyecto' in message_lower) or \
+                   ('call center' in message_lower and any(kw in message_lower for kw in ['ai', 'ia', 'inteligencia'])):
+                    force_engineer_agent = True
+                    logger.info("Forzando EngineerAgent para proyecto de call center con IA")
+            
+            # Obtener el agente adecuado
+            if force_engineer_agent:
+                # Forzar el uso del EngineerAgent
+                agent = next((a for a in self.agents if a.__class__.__name__ == 'EngineerAgent'), None)
+                if agent:
+                    # Actualizar explícitamente el agente actual en el contexto
+                    working_context['current_agent'] = 'EngineerAgent'
+                else:
+                    # Usar selección normal si no se encuentra el EngineerAgent
+                    agent = self.select_agent(message, working_context)
+            else:
+                # Verificar si estamos en una conversación de ventas con mensajes cortos
+                sales_keywords = ['precio', 'costo', 'presupuesto', 'cotización', 'cotizacion']
+                is_sales_conversation = (
+                    current_agent_name == 'SalesAgent' and
+                    (len(message.split()) <= 3 or any(keyword in message.lower() for keyword in sales_keywords))
+                )
+                
+                if is_sales_conversation:
+                    # Mantener el agente de ventas para mensajes cortos o relacionados con ventas
+                    agent = next((a for a in self.agents if a.__class__.__name__ == 'SalesAgent'), None)
+                    logger.info("Manteniendo SalesAgent para mensaje corto o relacionado con ventas")
+                else:
+                    # Utilizar la selección normal basada en confianza
+                    agent = self.select_agent(message, working_context)
         
         if not agent:
             # Si no hay agente disponible, devolver un mensaje de error
@@ -379,6 +463,9 @@ class AgentManager:
             Un generador con la respuesta del agente
         """
         try:
+            # Actualizar el agente actual en el contexto
+            context['current_agent'] = agent.__class__.__name__
+            
             # Procesar el mensaje con el agente
             full_response = ""
             for chunk in agent.process(message, context):

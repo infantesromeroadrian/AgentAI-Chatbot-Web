@@ -8,6 +8,8 @@ from .base_agent import BaseAgent
 from data.data_manager import DataManager
 import re
 import logging
+import os
+import traceback
 
 class DataCollectionAgent(BaseAgent):
     """
@@ -497,8 +499,38 @@ Historial de conversación:
             'interest': context.get('project_info', {}).get('interest', '')
         }
         
+        # Si hay información de proyecto, añadirla
+        if context.get('project_file_content'):
+            lead_data['project_file_name'] = context.get('project_file_name', 'documento.txt')
+        
+        if context.get('project_estimate'):
+            lead_data['project_estimate'] = context.get('project_estimate')
+        
         # Guardar el lead
-        self.data_manager.save_lead(lead_data)
+        save_success = self.data_manager.save_lead(lead_data)
+        
+        # Generar resumen del proyecto para uso interno
+        if save_success:
+            try:
+                # Generar resumen detallado del proyecto
+                project_summary = self.data_manager.generate_project_summary(lead_data, context)
+                
+                # Guardar el resumen en un archivo separado para facilitar su acceso
+                summary_filename = f"client_summary_{lead_data.get('email', '').replace('@', '_at_')}.txt"
+                summary_path = os.path.join("data", summary_filename)
+                with open(summary_path, 'w', encoding='utf-8') as f:
+                    f.write(project_summary)
+                
+                # Log del resumen para depuración
+                print(f"Resumen del proyecto generado y guardado en: {summary_path}")
+                print(f"Resumen: {project_summary[:200]}...")
+                
+                # Enviar correo electrónico con el resumen del proyecto (implementación futura)
+                # self._send_project_summary_email(lead_data, project_summary)
+                
+            except Exception as e:
+                print(f"Error al generar o guardar el resumen del proyecto: {str(e)}")
+                traceback.print_exc()
         
         # Marcar que el formulario ha sido completado en el contexto
         context['form_completed'] = True

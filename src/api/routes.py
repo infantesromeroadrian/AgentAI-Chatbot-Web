@@ -4,6 +4,8 @@ Define las rutas y endpoints de la API del chatbot.
 import json
 import re
 import traceback
+import os
+import tempfile
 from flask import request, jsonify, render_template, Response, stream_with_context, session
 from services.lm_studio import send_chat_request, check_lm_studio_connection
 from utils.alisys_info import get_alisys_info, generate_alisys_info_stream, generate_contact_form_stream
@@ -14,6 +16,15 @@ from agents.general_agent import GeneralAgent
 from agents.sales_agent import SalesAgent
 from agents.engineer_agent import EngineerAgent
 from agents.data_collection_agent import DataCollectionAgent
+from datetime import datetime
+
+# Importar librería para procesar PDFs
+try:
+    import PyPDF2
+    PDF_SUPPORT = True
+except ImportError:
+    PDF_SUPPORT = False
+    print("PyPDF2 no está instalado. El soporte para PDFs está deshabilitado.")
 
 # Inicializar el gestor de datos
 data_manager = DataManager()
@@ -43,11 +54,174 @@ def register_routes(app):
         session['form_active'] = False
         session['form_completed'] = False
         session['last_user_message'] = ''
+        # Reiniciar variables de proyecto y archivo
+        session['project_file_content'] = None
+        session['project_file_name'] = None
+        session['project_estimate'] = None
         
         # Reiniciar el contexto del gestor de agentes
         agent_manager.reset()
         
         return render_template('index.html')
+    
+    @app.route('/process-pdf', methods=['POST'])
+    def process_pdf():
+        """Endpoint para procesar archivos PDF y extraer su texto"""
+        if not PDF_SUPPORT:
+            return jsonify({
+                "success": False,
+                "error": "El soporte para PDFs no está disponible en el servidor"
+            })
+        
+        if 'file' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "No se ha proporcionado ningún archivo"
+            })
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({
+                "success": False,
+                "error": "Nombre de archivo vacío"
+            })
+        
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({
+                "success": False,
+                "error": "El archivo debe ser un PDF"
+            })
+        
+        try:
+            # Guardar el archivo temporalmente
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp:
+                file.save(temp.name)
+                temp_filename = temp.name
+            
+            # Procesar el PDF
+            text = extract_text_from_pdf(temp_filename)
+            
+            # Eliminar el archivo temporal
+            os.unlink(temp_filename)
+            
+            # Añadir el contenido del archivo a la sesión para uso posterior
+            session['project_file_content'] = text
+            session['project_file_name'] = file.filename
+            
+            return jsonify({
+                "success": True,
+                "text": text
+            })
+        except Exception as e:
+            print(f"Error al procesar PDF: {str(e)}")
+            traceback.print_exc()
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            })
+    
+    @app.route('/process-txt', methods=['POST'])
+    def process_txt():
+        """Endpoint para procesar archivos de texto"""
+        if 'file' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "No se ha proporcionado ningún archivo"
+            })
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({
+                "success": False,
+                "error": "Nombre de archivo vacío"
+            })
+        
+        if not file.filename.lower().endswith('.txt'):
+            return jsonify({
+                "success": False,
+                "error": "El archivo debe ser un TXT"
+            })
+        
+        try:
+            # Leer el contenido del archivo
+            text = file.read().decode('utf-8', errors='ignore')
+            
+            # Añadir el contenido del archivo a la sesión para uso posterior
+            session['project_file_content'] = text
+            session['project_file_name'] = file.filename
+            
+            return jsonify({
+                "success": True,
+                "text": text
+            })
+        except Exception as e:
+            print(f"Error al procesar TXT: {str(e)}")
+            traceback.print_exc()
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            })
+    
+    @app.route('/project/estimate', methods=['POST'])
+    def save_project_estimate():
+        """Endpoint para guardar la estimación del proyecto"""
+        data = request.json
+        
+        if not data or 'estimate' not in data:
+            return jsonify({
+                "success": False,
+                "error": "No se ha proporcionado una estimación"
+            })
+        
+        try:
+            # Guardar la estimación en la sesión
+            session['project_estimate'] = data['estimate']
+            
+            return jsonify({
+                "success": True,
+                "message": "Estimación guardada correctamente"
+            })
+        except Exception as e:
+            print(f"Error al guardar estimación: {str(e)}")
+            traceback.print_exc()
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            })
+    
+    @app.route('/project/info', methods=['GET'])
+    def get_project_info():
+        """Endpoint para obtener la información del proyecto"""
+        try:
+            project_info = {
+                "file_name": session.get('project_file_name'),
+                "file_content": session.get('project_file_content'),
+                "estimate": session.get('project_estimate')
+            }
+            
+            return jsonify({
+                "success": True,
+                "project_info": project_info
+            })
+        except Exception as e:
+            print(f"Error al obtener información del proyecto: {str(e)}")
+            traceback.print_exc()
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            })
+    
+    def extract_text_from_pdf(file_path):
+        """Extrae texto de un archivo PDF"""
+        text = ""
+        with open(file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page_num in range(len(pdf_reader.pages)):
+                page = pdf_reader.pages[page_num]
+                text += page.extract_text() + "\n\n"
+        return text
     
     @app.route('/health', methods=['GET'])
     def health():
@@ -130,7 +304,10 @@ def register_routes(app):
             'current_agent': session.get('current_agent', None),
             'previous_agent': session.get('previous_agent', None),
             'user_info': session.get('user_info', {}),
-            'project_info': session.get('project_info', {})
+            'project_info': session.get('project_info', {}),
+            'project_file_content': session.get('project_file_content'),
+            'project_file_name': session.get('project_file_name'),
+            'project_estimate': session.get('project_estimate')
         }
     
     def _process_with_agents(user_message, context):
@@ -149,6 +326,10 @@ def register_routes(app):
             session['previous_agent'] = context.get('previous_agent')
             session['user_info'] = context.get('user_info', {})
             session['project_info'] = context.get('project_info', {})
+            
+            # Guardar la estimación del proyecto si fue generada
+            if 'project_estimate' in context and context['project_estimate']:
+                session['project_estimate'] = context['project_estimate']
             
             # Actualizar variables de formulario si fueron modificadas por los agentes
             if 'form_completed' in context:
@@ -294,6 +475,16 @@ def register_routes(app):
         if user_message and 'message' not in data:
             data['message'] = user_message
         
+        # Si hay una estimación de proyecto, añadirla a los datos
+        project_estimate = session.get('project_estimate')
+        if project_estimate:
+            data['project_estimate'] = project_estimate
+        
+        # Si hay un archivo de proyecto, añadir su nombre
+        project_file_name = session.get('project_file_name')
+        if project_file_name:
+            data['project_file_name'] = project_file_name
+        
         # Guardar los datos
         try:
             # Asegurarse de que todos los campos necesarios estén presentes
@@ -354,7 +545,9 @@ def register_routes(app):
                     'company': lead.company,
                     'interest': lead.interest,
                     'message': lead.message,
-                    'created_at': lead.created_at.isoformat() if lead.created_at else None
+                    'created_at': lead.created_at.isoformat() if lead.created_at else None,
+                    'project_estimate': getattr(lead, 'project_estimate', None),
+                    'project_file_name': getattr(lead, 'project_file_name', None)
                 })
             
             # Renderizar plantilla HTML con los leads
@@ -384,7 +577,9 @@ def register_routes(app):
                             "email": last_lead.get('email', ''),
                             "phone": last_lead.get('phone', 'No proporcionado'),
                             "company": last_lead.get('company', 'No proporcionada'),
-                            "interest": last_lead.get('interest', 'No especificado')
+                            "interest": last_lead.get('interest', 'No especificado'),
+                            "project_estimate": last_lead.get('project_estimate', 'No disponible'),
+                            "project_file_name": last_lead.get('project_file_name', 'No disponible')
                         }
                     })
                 else:
@@ -405,7 +600,9 @@ def register_routes(app):
                 'company': last_lead.company,
                 'interest': last_lead.interest,
                 'message': last_lead.message,
-                'created_at': last_lead.created_at.isoformat() if last_lead.created_at else None
+                'created_at': last_lead.created_at.isoformat() if last_lead.created_at else None,
+                'project_estimate': getattr(last_lead, 'project_estimate', None),
+                'project_file_name': getattr(last_lead, 'project_file_name', None)
             }
             
             return jsonify({
@@ -418,4 +615,121 @@ def register_routes(app):
             return jsonify({
                 "success": False,
                 "message": f"Error al obtener el último lead: {str(e)}"
+            })
+    
+    @app.route('/admin/project-summaries', methods=['GET'])
+    def project_summaries():
+        """Endpoint para ver los resúmenes de proyectos generados"""
+        # Verificar autenticación básica
+        auth = request.authorization
+        if not auth or auth.username != 'admin' or auth.password != 'alisys2024':
+            return Response(
+                'Autenticación requerida', 401,
+                {'WWW-Authenticate': 'Basic realm="Login Required"'}
+            )
+        
+        try:
+            # Obtener todos los archivos de resumen de proyectos
+            data_dir = "data"
+            summaries = []
+            
+            # Buscar archivos de resumen en formato TXT
+            for filename in os.listdir(data_dir):
+                if filename.startswith("client_summary_") and filename.endswith(".txt"):
+                    file_path = os.path.join(data_dir, filename)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            summary_text = f.read()
+                        
+                        # Extraer el email del nombre del archivo
+                        email = filename.replace("client_summary_", "").replace(".txt", "").replace("_at_", "@")
+                        
+                        # Obtener la fecha de modificación del archivo
+                        modified_time = os.path.getmtime(file_path)
+                        modified_date = datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        summaries.append({
+                            'email': email,
+                            'filename': filename,
+                            'modified_date': modified_date,
+                            'summary': summary_text
+                        })
+                    except Exception as e:
+                        print(f"Error al leer el archivo {filename}: {str(e)}")
+            
+            # Buscar archivos de resumen en formato JSON
+            for filename in os.listdir(data_dir):
+                if filename.startswith("client_summary_") and filename.endswith(".json"):
+                    file_path = os.path.join(data_dir, filename)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            summary_data = json.load(f)
+                        
+                        # Extraer el email del nombre del archivo
+                        email = filename.replace("client_summary_", "").replace(".json", "").replace("_at_", "@")
+                        
+                        # Obtener la fecha de modificación del archivo
+                        modified_time = os.path.getmtime(file_path)
+                        modified_date = datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # Verificar si ya existe un resumen en formato TXT para este cliente
+                        existing_summary = next((s for s in summaries if s['email'] == email), None)
+                        
+                        if not existing_summary:
+                            # Generar un resumen en texto a partir de los datos JSON
+                            client_info = summary_data.get('client_info', {})
+                            project_info = summary_data.get('project_info', {})
+                            technical_analysis = summary_data.get('technical_analysis', {})
+                            
+                            summary_text = f"""
+RESUMEN DE LEAD - {modified_date}
+
+INFORMACIÓN DEL CLIENTE:
+- Nombre: {client_info.get('name', 'No proporcionado')}
+- Email: {client_info.get('email', 'No proporcionado')}
+- Teléfono: {client_info.get('phone', 'No proporcionado')}
+- Empresa: {client_info.get('company', 'No proporcionada')}
+- Interés: {client_info.get('interest', 'No especificado')}
+
+RESUMEN DEL PROYECTO:
+"""
+                            
+                            # Añadir detalles sobre el archivo subido si existe
+                            if project_info.get('has_uploaded_file'):
+                                summary_text += f"- Cliente subió archivo: {project_info.get('file_name')}\n"
+                            
+                            # Añadir análisis técnico si existe
+                            if technical_analysis:
+                                summary_text += f"""
+ANÁLISIS TÉCNICO:
+- Complejidad: {technical_analysis.get('complejidad', 'No determinada')}
+- Tecnologías recomendadas: {', '.join(technical_analysis.get('tecnologias_recomendadas', ['No determinadas']))}
+- Tiempo estimado: {technical_analysis.get('tiempo_estimado', 'No determinado')}
+- Desarrolladores recomendados: {technical_analysis.get('num_desarrolladores', 'No determinado')}
+- Presupuesto estimado: {technical_analysis.get('costo_total', 'No determinado')} {technical_analysis.get('moneda', 'EUR')}
+"""
+                            
+                            # Añadir resumen de la conversación
+                            if project_info.get('conversation_summary'):
+                                summary_text += f"\nRESUMEN DE LA CONVERSACIÓN:\n{project_info.get('conversation_summary')[:500]}...\n"
+                            
+                            summaries.append({
+                                'email': email,
+                                'filename': filename,
+                                'modified_date': modified_date,
+                                'summary': summary_text,
+                                'json_data': summary_data
+                            })
+                    except Exception as e:
+                        print(f"Error al leer el archivo JSON {filename}: {str(e)}")
+            
+            # Ordenar los resúmenes por fecha de modificación (más reciente primero)
+            summaries.sort(key=lambda x: x['modified_date'], reverse=True)
+            
+            # Renderizar plantilla HTML con los resúmenes
+            return render_template('project_summaries.html', summaries=summaries)
+        except Exception as e:
+            return jsonify({
+                "error": str(e),
+                "message": "Error al obtener los resúmenes de proyectos."
             }) 

@@ -226,6 +226,97 @@ class DataManager:
         # Devolver éxito si al menos un repositorio funcionó
         return json_success or db_success
     
+    def generate_project_summary(self, lead_data: Dict[str, Any], context: Dict[str, Any]) -> str:
+        """
+        Genera un resumen del proyecto basado en los datos del lead y el contexto de la conversación.
+        Este resumen está diseñado para uso interno del equipo de ventas y técnico.
+        
+        Args:
+            lead_data (Dict): Datos del lead que se ha guardado
+            context (Dict): Contexto completo de la conversación
+            
+        Returns:
+            str: Resumen estructurado del proyecto y necesidades del cliente
+        """
+        try:
+            # Extraer información relevante del contexto
+            project_file_content = context.get('project_file_content')
+            project_file_name = context.get('project_file_name')
+            project_estimate = context.get('project_estimate')
+            
+            # Extraer mensajes de conversación para analizar
+            all_messages = context.get('messages', [])
+            user_messages = [msg.get('content', '') for msg in all_messages if msg.get('role') == 'user']
+            last_messages = user_messages[-5:] if len(user_messages) > 5 else user_messages
+            
+            # Crear una estructura con toda la información relevante
+            summary_data = {
+                "client_info": {
+                    "name": lead_data.get('name', 'No proporcionado'),
+                    "email": lead_data.get('email', 'No proporcionado'),
+                    "phone": lead_data.get('phone', 'No proporcionado'),
+                    "company": lead_data.get('company', 'No proporcionada'),
+                    "interest": lead_data.get('interest', 'No especificado')
+                },
+                "project_info": {
+                    "has_uploaded_file": project_file_name is not None,
+                    "file_name": project_file_name,
+                    "conversation_summary": " ".join(last_messages)
+                },
+                "technical_analysis": project_estimate if project_estimate else {},
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Generar el resumen en formato texto
+            summary = f"""
+RESUMEN DE LEAD - {datetime.now().strftime('%d/%m/%Y %H:%M')}
+
+INFORMACIÓN DEL CLIENTE:
+- Nombre: {lead_data.get('name', 'No proporcionado')}
+- Email: {lead_data.get('email', 'No proporcionado')}
+- Teléfono: {lead_data.get('phone', 'No proporcionado')}
+- Empresa: {lead_data.get('company', 'No proporcionada')}
+- Interés: {lead_data.get('interest', 'No especificado')}
+
+RESUMEN DEL PROYECTO:
+"""
+            
+            # Añadir detalles sobre el archivo subido si existe
+            if project_file_name:
+                summary += f"- Cliente subió archivo: {project_file_name}\n"
+                
+                # Si hay estimación técnica, añadirla
+                if project_estimate:
+                    summary += f"""
+ANÁLISIS TÉCNICO:
+- Complejidad: {project_estimate.get('complejidad', 'No determinada')}
+- Tecnologías recomendadas: {', '.join(project_estimate.get('tecnologias_recomendadas', ['No determinadas']))}
+- Tiempo estimado: {project_estimate.get('tiempo_estimado', 'No determinado')}
+- Desarrolladores recomendados: {project_estimate.get('num_desarrolladores', 'No determinado')}
+- Presupuesto estimado: {project_estimate.get('costo_total', 'No determinado')} {project_estimate.get('moneda', 'EUR')}
+"""
+            
+            # Añadir resumen de la conversación
+            summary += "\nRESUMEN DE LA CONVERSACIÓN:\n"
+            if last_messages:
+                for i, msg in enumerate(last_messages):
+                    summary += f"- Mensaje {i+1}: {msg[:100]}{'...' if len(msg) > 100 else ''}\n"
+            else:
+                summary += "- No hay mensajes disponibles para resumir.\n"
+            
+            # Guardar el resumen en un archivo JSON por cliente
+            summary_filename = f"client_summary_{lead_data.get('email', '').replace('@', '_at_')}.json"
+            summary_path = os.path.join(self.json_repository.data_dir, summary_filename)
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary_data, f, ensure_ascii=False, indent=2)
+            
+            return summary
+            
+        except Exception as e:
+            print(f"Error al generar el resumen del proyecto: {str(e)}")
+            traceback.print_exc()
+            return f"Error al generar el resumen: {str(e)}"
+    
     def get_leads(self) -> List[Dict[str, Any]]:
         """
         Retorna los leads guardados, prefiriendo los de la base de datos.
